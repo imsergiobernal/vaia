@@ -8,7 +8,7 @@
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm -r lint",
     "generate": "pnpm --filter @imsergiobernal/vaia-sdk generate",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --test scripts/*.test.mjs"
   },
   "keywords": [],
   "author": "",

@@ -25,7 +25,6 @@ jobs:
     timeout-minutes: 20
     outputs:
       tag: ${{ steps.validate.outputs.tag }}
-      prerelease: ${{ steps.validate.outputs.prerelease }}
     env:
       RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
     steps:
@@ -33,6 +32,7 @@ jobs:
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           ref: refs/tags/${{ env.RELEASE_TAG }}
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Set up Node.js
@@ -41,40 +41,23 @@ jobs:
           node-version: '22'
           package-manager-cache: false
 
-      - name: Validate version and workspace
+      - name: Validate stable CLI tag, version and main history
         id: validate
         run: |
-          node --input-type=module <<'NODE'
-          import { appendFileSync, existsSync, readFileSync } from 'node:fs';
-
-          const tag = process.env.RELEASE_TAG;
-          const { version } = JSON.parse(readFileSync('apps/cli/package.json', 'utf8'));
-          if (!/^cli-v\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(tag) || tag !== `cli-v${version}`) {
-            throw new Error(`The release tag must match the CLI version: cli-v${version}`);
-          }
-
-          const required = [
-            'package.json',
-            'pnpm-workspace.yaml',
-            'pnpm-lock.yaml',
-            'apps/cli/src/bin/run.ts',
-          ];
-          const missing = required.filter((file) => !existsSync(file));
-          if (missing.length) {
-            throw new Error(`Commit the complete pnpm workspace, CLI sources, and @vaia/sdk before releasing. Missing: ${missing.join(', ')}`);
-          }
-
-          appendFileSync(process.env.GITHUB_OUTPUT, `tag=${tag}\nprerelease=${version.includes('-')}\n`);
-          NODE
+          mkdir -p "$RUNNER_TEMP/cli-assets"
+          node scripts/validate-release.mjs tag cli "$RELEASE_TAG" \
+            --notes-file "$RUNNER_TEMP/cli-assets/release-notes.md"
 
       - name: Set up pnpm
         uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
         with:
-          version: 10.20.0
           run_install: false
 
       - name: Install locked dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Test release preparation and validation
+        run: pnpm test
 
       - name: Build CLI and workspace dependencies
         run: pnpm --filter '@vaia/cli...' --fail-if-no-match -r run build
@@ -126,21 +109,15 @@ jobs:
           name: cli-release
           path: release-assets
 
-      - name: Publish release with generated notes
+      - name: Publish release with the prepared changelog notes
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ needs.build.outputs.tag }}
-          PRERELEASE: ${{ needs.build.outputs.prerelease }}
         run: |
           cd release-assets
           sha256sum --check SHA256SUMS
-          flags=()
-          if [[ "$PRERELEASE" == "true" ]]; then
-            flags+=(--prerelease)
-          fi
           gh release create "$RELEASE_TAG" ./*.tar.gz SHA256SUMS \
             --verify-tag \
             --title "Vaia CLI $RELEASE_TAG" \
-            --generate-notes \
-            "${flags[@]}"
+            --notes-file release-notes.md

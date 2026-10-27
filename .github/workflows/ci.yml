@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop, 'release/**', 'hotfix/**']
+  pull_request:
+    branches: [main, develop, 'release/**', 'hotfix/**']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate workspace and release convention
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22'
+          package-manager-cache: false
+
+      - name: Check release and hotfix branch versions
+        env:
+          HEAD_BRANCH: ${{ github.head_ref || github.ref_name }}
+          BASE_BRANCH: ${{ github.base_ref }}
+        run: |
+          for branch in "$HEAD_BRANCH" "$BASE_BRANCH"; do
+            case "$branch" in
+              release/*|hotfix/*) node scripts/validate-release.mjs branch "$branch" ;;
+            esac
+          done
+
+      - name: Set up pnpm from package.json
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+        with:
+          run_install: false
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Test release preparation and validation
+        run: pnpm test
+
+      - name: Build CLI and SDK
+        run: pnpm --filter '@vaia/cli...' --fail-if-no-match -r run build
+
+      - name: Check CLI and SDK types
+        run: pnpm --filter '@vaia/cli...' --fail-if-no-match -r run typecheck
+
+      - name: Verify CLI compatibility
+        run: |
+          node apps/cli/dist/bin/run.js --help
+          node apps/cli/dist/bin/run.js flashcards list --help
+          node apps/cli/dist/bin/run.js config show
+
+      - name: Verify the SDK package outside the workspace
+        uses: ./.github/actions/verify-sdk

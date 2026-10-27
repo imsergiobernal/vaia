@@ -1,0 +1,26 @@
+name: Verify SDK package
+description: Pack the SDK and verify runtime imports and declarations from an isolated consumer.
+
+runs:
+  using: composite
+  steps:
+    - name: Pack the SDK
+      shell: bash
+      run: |
+        mkdir -p "$RUNNER_TEMP/sdk-assets"
+        pnpm --filter @imsergiobernal/vaia-sdk pack --pack-destination "$RUNNER_TEMP/sdk-assets"
+
+    - name: Install and verify the packed SDK
+      shell: bash
+      run: |
+        archive="$(find "$RUNNER_TEMP/sdk-assets" -maxdepth 1 -name '*.tgz' -print -quit)"
+        test -n "$archive"
+        mkdir -p "$RUNNER_TEMP/sdk-smoke"
+        cp scripts/smoke-sdk.mjs scripts/sdk-consumer.mts "$RUNNER_TEMP/sdk-smoke/"
+        cd "$RUNNER_TEMP/sdk-smoke"
+        npm install --ignore-scripts --no-audit --no-fund "$archive"
+        node smoke-sdk.mjs
+        node "$GITHUB_WORKSPACE/packages/sdk/node_modules/typescript/bin/tsc" \
+          --noEmit --strict --module NodeNext --moduleResolution NodeNext --target ES2022 sdk-consumer.mts
+        cd "$RUNNER_TEMP/sdk-assets"
+        sha256sum ./*.tgz > SHA256SUMS
