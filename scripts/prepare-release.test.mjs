@@ -15,7 +15,7 @@ releasePlease.setLogger(new Proxy({}, { get: () => () => {} }));
 class MemoryGitHub {
   repository = { owner: 'example', repo: 'vaia', defaultBranch: 'main' };
   files = new Map([
-    ['apps/cli/package.json', JSON.stringify({ name: '@vaia/cli', version: '0.2.0' })],
+    ['apps/cli/package.json', JSON.stringify({ name: '@imsergiobernal/vaia-cli', version: '0.2.0' })],
     ['packages/sdk/package.json', JSON.stringify({ name: '@imsergiobernal/vaia-sdk', version: '0.3.0' })],
   ]);
   commits = [

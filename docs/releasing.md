@@ -111,14 +111,22 @@ new features on `develop`. Do not bump the other component just to match version
 An SDK release must still build and type-check the CLI and pass its smoke checks.
 It does not publish the CLI.
 
+The CLI package is published as `@imsergiobernal/vaia-cli` and exposes the `vaia`
+command. Packing converts its workspace SDK dependency into the exact current
+`@imsergiobernal/vaia-sdk` version. Publish that SDK version with its `sdk-vX.Y.Z`
+tag before pushing the CLI tag; an already published SDK version can be reused.
+The CLI publisher checks that dependency in GitHub Packages before publishing,
+and fails with a message if it is unavailable. CI tests the CLI tarball with a
+local packed SDK so development does not require publishing either package.
+
 Before finishing, merge the preparation PR, update your local release branch
 from its remote, wait for CI to pass and run the same checks locally:
 
 ```sh
 pnpm install --frozen-lockfile
 pnpm test
-pnpm --filter '@vaia/cli...' --fail-if-no-match -r run build
-pnpm --filter '@vaia/cli...' --fail-if-no-match -r run typecheck
+pnpm --filter '@imsergiobernal/vaia-cli...' --fail-if-no-match -r run build
+pnpm --filter '@imsergiobernal/vaia-cli...' --fail-if-no-match -r run typecheck
 ```
 
 ## Finish and publish
@@ -137,7 +145,9 @@ git push origin refs/tags/cli-v0.2.0
 Do not publish all tags together. The tag triggers only the matching workflow:
 
 - `cli-v*`: checks the CLI version and `main` history, builds the CLI and SDK,
-  verifies the extracted production bundle and publishes a GitHub Release.
+  installs and verifies the packed CLI outside the workspace, verifies the
+  extracted production bundle, publishes the same CLI `.tgz` to GitHub Packages,
+  and attaches both archives to a GitHub Release.
 - `sdk-v*`: checks the SDK version and `main` history, verifies CLI compatibility,
   installs the packed SDK in an isolated consumer, checks its runtime and types,
   and publishes that same `.tgz` to GitHub Packages and GitHub Releases.
@@ -145,7 +155,7 @@ Do not publish all tags together. The tag triggers only the matching workflow:
 The SDK GitHub Release does not replace the CLI as the repository's latest
 release. Publishing uses the workflow's `GITHUB_TOKEN`; only publication jobs
 receive write permissions. GitHub Packages installation instructions are in
-`packages/sdk/README.md`.
+`apps/cli/README.md` and `packages/sdk/README.md`.
 
 Both publishers require a single, nonempty `CHANGELOG.md` entry matching the
 tagged version in the corresponding package. The validator exports that exact

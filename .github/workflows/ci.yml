@@ -53,10 +53,10 @@ jobs:
         run: pnpm test
 
       - name: Build CLI and SDK
-        run: pnpm --filter '@vaia/cli...' --fail-if-no-match -r run build
+        run: pnpm --filter '@imsergiobernal/vaia-cli...' --fail-if-no-match -r run build
 
       - name: Check CLI and SDK types
-        run: pnpm --filter '@vaia/cli...' --fail-if-no-match -r run typecheck
+        run: pnpm --filter '@imsergiobernal/vaia-cli...' --fail-if-no-match -r run typecheck
 
       - name: Verify CLI compatibility
         run: |
@@ -66,3 +66,6 @@ jobs:
 
       - name: Verify the SDK package outside the workspace
         uses: ./.github/actions/verify-sdk
+
+      - name: Verify the CLI package outside the workspace
+        uses: ./.github/actions/verify-cli

@@ -1,9 +1,16 @@
 {
-  "name": "@vaia/cli",
+  "name": "@imsergiobernal/vaia-cli",
   "version": "0.1.0",
-  "private": true,
   "description": "Interactive and scriptable CLI for managing Vaia content.",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/imsergiobernal/vaia.git",
+    "directory": "apps/cli"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
   "bin": {
     "vaia": "./dist/bin/run.js"
   },

@@ -1,13 +1,35 @@
-# @vaia/cli
+# @imsergiobernal/vaia-cli
 
 CLI for managing Vaia content through `@imsergiobernal/vaia-sdk`.
+
+## Install from GitHub Packages
+
+Use Node.js 22 or newer. Configure the scope in your user npm configuration so
+global installations resolve both the CLI and its SDK dependency from GitHub Packages:
+
+```sh
+npm config set @imsergiobernal:registry https://npm.pkg.github.com --location=user
+npm login --scope=@imsergiobernal --registry=https://npm.pkg.github.com --auth-type=legacy
+npm install --global @imsergiobernal/vaia-cli
+vaia --help
+```
+
+Authenticate with a GitHub personal access token (classic) with `read:packages`
+and access to both packages. Keep the token in your user configuration, never in
+the repository. The installed executable is `vaia`; running it without arguments
+in a terminal opens the interactive menu.
+
+Each `cli-vX.Y.Z` release publishes the verified npm tarball to GitHub Packages
+and attaches it alongside the standalone production bundle to GitHub Releases.
+The CLI depends on the exact SDK version present when it is packed; that SDK
+version must be published before the CLI. See [the release procedure](../../docs/releasing.md).
 
 ## Run locally
 
 From the Vaia workspace root:
 
 ```sh
-pnpm --filter @vaia/cli dev
+pnpm --filter @imsergiobernal/vaia-cli dev
 ```
 
 Running without arguments in a terminal opens the interactive menu. In CI, use explicit commands:
@@ -17,25 +39,25 @@ study set's flashcards and subsets. Selecting a subset opens the same menu for t
 **Back to parent study set** to move up.
 
 ```sh
-pnpm --filter @vaia/cli dev -- flashcards list 71434395
-pnpm --filter @vaia/cli dev -- flashcards list 71434395 --cursor "<next-cursor>"
-pnpm --filter @vaia/cli dev -- flashcards list 71434395 --full
-pnpm --filter @vaia/cli dev -- flashcards list 71331662 --search "" --ratings bad,ok,good,perfect,unrated --visibility visible --created-by anybody --order anti-chronological --tag-ids 15280011,15280010 --quantity 20
-pnpm --filter @vaia/cli dev -- flashcards create 71434395 --payload ./flashcard.json
-pnpm --filter @vaia/cli dev -- flashcards update 71434395 1129037604 --payload ./flashcard.json
-pnpm --filter @vaia/cli dev -- flashcards bulk-update 71331662 --payload ./flashcard-updates.json --concurrency 4
-pnpm --filter @vaia/cli dev -- flashcards bulk-update 71331662 --payload ./flashcard-updates.json --dry-run
-pnpm --filter @vaia/cli dev -- flashcards move 71451219 71451371 --flashcard-ids 1135003712
-pnpm --filter @vaia/cli dev -- flashcards delete 71434395 1129037604
-pnpm --filter @vaia/cli dev -- studysets subsets 71331662
-pnpm --filter @vaia/cli dev -- studysets subsets 71331662 --full
-pnpm --filter @vaia/cli dev -- studysets list
-pnpm --filter @vaia/cli dev -- tags list 71331662
-pnpm --filter @vaia/cli dev -- tags list 71331662 --content-filter flashcards
-pnpm --filter @vaia/cli dev -- tags list 71331662 --full
-pnpm --filter @vaia/cli dev -- tags create 71451202 --name prueba --colour -1
-pnpm --filter @vaia/cli dev -- tags update 71451202 15310522 --name pruebaa --colour -1
-pnpm --filter @vaia/cli dev -- tags delete 71451202 15310510
+pnpm --filter @imsergiobernal/vaia-cli dev -- flashcards list 71434395
+pnpm --filter @imsergiobernal/vaia-cli dev -- flashcards list 71434395 --cursor "<next-cursor>"
+pnpm --filter @imsergiobernal/vaia-cli dev -- flashcards list 71434395 --full
+pnpm --filter @imsergiobernal/vaia-cli dev -- flashcards list 71331662 --search "" --ratings bad,ok,good,perfect,unrated --visibility visible --created-by anybody --order anti-chronological --tag-ids 15280011,15280010 --quantity 20
+pnpm --filter @imsergiobernal/vaia-cli dev -- flashcards create 71434395 --payload ./flashcard.json
+pnpm --filter @imsergiobernal/vaia-cli dev -- flashcards update 71434395 1129037604 --payload ./flashcard.json
+pnpm --filter @imsergiobernal/vaia-cli dev -- flashcards bulk-update 71331662 --payload ./flashcard-updates.json --concurrency 4
+pnpm --filter @imsergiobernal/vaia-cli dev -- flashcards bulk-update 71331662 --payload ./flashcard-updates.json --dry-run
+pnpm --filter @imsergiobernal/vaia-cli dev -- flashcards move 71451219 71451371 --flashcard-ids 1135003712
+pnpm --filter @imsergiobernal/vaia-cli dev -- flashcards delete 71434395 1129037604
+pnpm --filter @imsergiobernal/vaia-cli dev -- studysets subsets 71331662
+pnpm --filter @imsergiobernal/vaia-cli dev -- studysets subsets 71331662 --full
+pnpm --filter @imsergiobernal/vaia-cli dev -- studysets list
+pnpm --filter @imsergiobernal/vaia-cli dev -- tags list 71331662
+pnpm --filter @imsergiobernal/vaia-cli dev -- tags list 71331662 --content-filter flashcards
+pnpm --filter @imsergiobernal/vaia-cli dev -- tags list 71331662 --full
+pnpm --filter @imsergiobernal/vaia-cli dev -- tags create 71451202 --name prueba --colour -1
+pnpm --filter @imsergiobernal/vaia-cli dev -- tags update 71451202 15310522 --name pruebaa --colour -1
+pnpm --filter @imsergiobernal/vaia-cli dev -- tags delete 71451202 15310510
 ```
 
 `studysets subsets <studyset-id>` lists the child study sets. Progress counters are included by
@@ -72,8 +94,8 @@ is entered through a hidden prompt. `VAIA_API_URL` overrides the saved URL; when
 the SDK's default URL is used.
 
 ```sh
-pnpm --filter @vaia/cli dev -- config show
-pnpm --filter @vaia/cli dev -- config set-url https://app.vaia.com
+pnpm --filter @imsergiobernal/vaia-cli dev -- config show
+pnpm --filter @imsergiobernal/vaia-cli dev -- config set-url https://app.vaia.com
 ```
 
 `config show` masks the token. Flashcard create, update, and delete make changes immediately; the

@@ -25,6 +25,7 @@ jobs:
     timeout-minutes: 20
     outputs:
       tag: ${{ steps.validate.outputs.tag }}
+      sdk_dependency: ${{ steps.package.outputs.sdk_dependency }}
     env:
       RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
     steps:
@@ -60,13 +61,17 @@ jobs:
         run: pnpm test
 
       - name: Build CLI and workspace dependencies
-        run: pnpm --filter '@vaia/cli...' --fail-if-no-match -r run build
+        run: pnpm --filter '@imsergiobernal/vaia-cli...' --fail-if-no-match -r run build
 
       - name: Check types
-        run: pnpm --filter '@vaia/cli...' --fail-if-no-match -r run typecheck
+        run: pnpm --filter '@imsergiobernal/vaia-cli...' --fail-if-no-match -r run typecheck
+
+      - name: Verify the CLI package outside the workspace
+        id: package
+        uses: ./.github/actions/verify-cli
 
       - name: Bundle production dependencies
-        run: pnpm --filter @vaia/cli --prod deploy --legacy "$RUNNER_TEMP/cli-release/vaia-cli"
+        run: pnpm --filter @imsergiobernal/vaia-cli --prod deploy --legacy "$RUNNER_TEMP/cli-release/vaia-cli"
 
       - name: Create archive and checksum
         run: |
@@ -74,7 +79,7 @@ jobs:
           archive="vaia-${RELEASE_TAG}-linux-x64.tar.gz"
           tar -czf "$RUNNER_TEMP/cli-assets/$archive" -C "$RUNNER_TEMP/cli-release" vaia-cli
           cd "$RUNNER_TEMP/cli-assets"
-          sha256sum "$archive" > SHA256SUMS
+          sha256sum "$archive" ./*.tgz > SHA256SUMS
 
       - name: Verify the extracted release
         run: |
@@ -96,18 +101,40 @@ jobs:
           retention-days: 7
 
   release:
-    name: Publish GitHub Release
+    name: Publish CLI to GitHub Packages and Releases
     needs: build
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
       contents: write
+      packages: write
     steps:
+      - name: Set up Node.js and GitHub Packages authentication
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22'
+          package-manager-cache: false
+          registry-url: https://npm.pkg.github.com
+          scope: '@imsergiobernal'
+
       - name: Download verified release assets
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: cli-release
           path: release-assets
+
+      - name: Publish the verified CLI package
+        env:
+          NODE_AUTH_TOKEN: ${{ github.token }}
+          SDK_DEPENDENCY: ${{ needs.build.outputs.sdk_dependency }}
+        run: |
+          cd release-assets
+          sha256sum --check SHA256SUMS
+          if ! npm view "$SDK_DEPENDENCY" version --registry https://npm.pkg.github.com; then
+            echo "::error::Publish $SDK_DEPENDENCY with its sdk-v tag before publishing the CLI."
+            exit 1
+          fi
+          npm publish ./*.tgz --registry https://npm.pkg.github.com --ignore-scripts
 
       - name: Publish release with the prepared changelog notes
         env:
@@ -117,7 +144,7 @@ jobs:
         run: |
           cd release-assets
           sha256sum --check SHA256SUMS
-          gh release create "$RELEASE_TAG" ./*.tar.gz SHA256SUMS \
+          gh release create "$RELEASE_TAG" ./*.tar.gz ./*.tgz SHA256SUMS \
             --verify-tag \
             --title "Vaia CLI $RELEASE_TAG" \
             --notes-file release-notes.md
