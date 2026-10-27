@@ -1,0 +1,70 @@
+name: Prepare release PR
+
+on:
+  push:
+    branches: ['release/**', 'hotfix/**']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-please-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Prepare component release PR
+    if: ${{ !github.event.deleted }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      RELEASE_BRANCH: ${{ github.ref_name }}
+    steps:
+      - name: Check out the stabilization branch
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22'
+          package-manager-cache: false
+
+      - name: Validate component and target version before authentication
+        run: node scripts/validate-release.mjs branch "$RELEASE_BRANCH"
+
+      - name: Check GitHub App configuration
+        env:
+          APP_ID: ${{ vars.RELEASE_PLEASE_APP_ID }}
+          APP_PRIVATE_KEY: ${{ secrets.RELEASE_PLEASE_APP_PRIVATE_KEY }}
+        run: |
+          if [[ -z "$APP_ID" || -z "$APP_PRIVATE_KEY" ]]; then
+            echo '::error::Configure the RELEASE_PLEASE_APP_ID repository variable and RELEASE_PLEASE_APP_PRIVATE_KEY secret. Install the App only on this repository with Contents, Pull requests and Issues write permissions.'
+            exit 1
+          fi
+
+      - name: Set up pnpm from package.json
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+        with:
+          run_install: false
+
+      - name: Install the locked Release Please version
+        run: pnpm install --frozen-lockfile
+
+      - name: Create a token limited to this repository
+        id: app-token
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
+        with:
+          app-id: ${{ vars.RELEASE_PLEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_PLEASE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+          permission-contents: write
+          permission-pull-requests: write
+          permission-issues: write
+
+      - name: Create or update only the preparation PR
+        env:
+          RELEASE_PLEASE_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: pnpm release:prepare "$RELEASE_BRANCH"

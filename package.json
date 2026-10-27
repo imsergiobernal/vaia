@@ -8,6 +8,7 @@
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm -r lint",
     "generate": "pnpm --filter @imsergiobernal/vaia-sdk generate",
+    "release:prepare": "node scripts/prepare-release.mjs",
     "test": "node --test scripts/*.test.mjs"
   },
   "keywords": [],
@@ -21,5 +22,8 @@
     }
   },
   "packageManager": "pnpm@12.6.0",
-  "type": "module"
+  "type": "module",
+  "devDependencies": {
+    "release-please": "17.11.2"
+  }
 }
