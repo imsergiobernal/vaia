@@ -5,7 +5,7 @@ import {
   NetworkError,
   type StudysetList,
   type StudysetSubset,
-} from "@vaia/sdk";
+} from "@imsergiobernal/vaia-sdk";
 import { resolveConfig } from "./config.js";
 import { CliActionError } from "./flashcards.js";
 

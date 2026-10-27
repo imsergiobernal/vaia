@@ -7,7 +7,7 @@
     "dev": "pnpm --parallel -r dev",
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm -r lint",
-    "generate": "pnpm --filter @vaia/sdk generate",
+    "generate": "pnpm --filter @imsergiobernal/vaia-sdk generate",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

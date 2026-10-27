@@ -1,5 +1,5 @@
 import { encode } from "@toon-format/toon";
-import { ApiError, createClient, NetworkError, type StudysetTag, type StudysetTagsResponse } from "@vaia/sdk";
+import { ApiError, createClient, NetworkError, type StudysetTag, type StudysetTagsResponse } from "@imsergiobernal/vaia-sdk";
 import { resolveConfig } from "./config.js";
 import { CliActionError, writeCliError } from "./flashcards.js";
 

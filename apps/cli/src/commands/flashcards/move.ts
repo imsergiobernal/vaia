@@ -1,6 +1,6 @@
 import { Args, Command, Flags } from "@oclif/core";
 import { encode } from "@toon-format/toon";
-import { ApiError, createClient, NetworkError } from "@vaia/sdk";
+import { ApiError, createClient, NetworkError } from "@imsergiobernal/vaia-sdk";
 import { resolveConfig } from "../../config.js";
 import { CliActionError, writeCliError } from "../../flashcards.js";
 

@@ -29,7 +29,7 @@
     "@oclif/core": "^4.5.0",
     "@oclif/plugin-help": "^6.2.30",
     "@toon-format/toon": "^4.1.1",
-    "@vaia/sdk": "workspace:*",
+    "@imsergiobernal/vaia-sdk": "workspace:*",
     "env-paths": "^3.0.0"
   },
   "devDependencies": {

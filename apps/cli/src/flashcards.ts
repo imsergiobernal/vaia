@@ -9,7 +9,7 @@ import {
   type FlashcardPage,
   type FlashcardPayload,
   type ListFlashcardsOptions,
-} from "@vaia/sdk";
+} from "@imsergiobernal/vaia-sdk";
 import { resolveConfig } from "./config.js";
 
 export interface FlashcardIds {

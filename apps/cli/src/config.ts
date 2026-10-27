@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import envPaths from "env-paths";
-import { createClient, DEFAULT_BASE_URL, type VaiaClient } from "@vaia/sdk";
+import { createClient, DEFAULT_BASE_URL, type VaiaClient } from "@imsergiobernal/vaia-sdk";
 
 const configDirectory = envPaths("vaia").config;
 export const configFilePath = path.join(configDirectory, "config.json");

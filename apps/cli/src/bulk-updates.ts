@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { encode } from "@toon-format/toon";
-import { ApiError, createClient, NetworkError, type FlashcardPayload } from "@vaia/sdk";
+import { ApiError, createClient, NetworkError, type FlashcardPayload } from "@imsergiobernal/vaia-sdk";
 import { resolveConfig } from "./config.js";
 
 interface BulkUpdate {
