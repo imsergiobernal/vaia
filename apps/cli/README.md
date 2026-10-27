@@ -1,6 +1,6 @@
 # @vaia/cli
 
-CLI for managing Vaia content through `@vaia/sdk`.
+CLI for managing Vaia content through `@imsergiobernal/vaia-sdk`.
 
 ## Run locally
 
