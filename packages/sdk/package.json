@@ -1,0 +1,26 @@
+{
+  "name": "@vaia/sdk",
+  "version": "0.1.0",
+  "description": "Typed HTTP client for the Vaia API described by @vaia/openapi.",
+  "type": "module",
+  "files": ["dist"],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "generate": "openapi-typescript ../openapi/openapi.yaml -o src/generated/schema.ts",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@vaia/openapi": "workspace:*",
+    "openapi-fetch": "^0.14.0"
+  },
+  "devDependencies": {
+    "openapi-typescript": "^7.6.1",
+    "typescript": "^5.8.3"
+  }
+}
