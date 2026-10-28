@@ -6,7 +6,8 @@ let requests = 0;
 const client = createClient({
   baseUrl: 'https://sdk-smoke.invalid',
   token: 'smoke-test',
-  fetch: async (request) => {
+  fetch: async (input, init) => {
+    const request = new Request(input, init);
     requests += 1;
     assert.equal(new URL(request.url).pathname, '/studysets/');
     assert.equal(new URL(request.url).searchParams.get('is_archived'), 'false');

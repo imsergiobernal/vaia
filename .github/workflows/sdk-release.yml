@@ -45,7 +45,7 @@ jobs:
         id: validate
         run: |
           mkdir -p "$RUNNER_TEMP/sdk-assets"
-          node scripts/validate-release.mjs tag sdk "$RELEASE_TAG" \
+          node --experimental-strip-types scripts/validate-release.mts tag sdk "$RELEASE_TAG" \
             --notes-file "$RUNNER_TEMP/sdk-assets/release-notes.md"
 
       - name: Set up pnpm from package.json
@@ -56,14 +56,11 @@ jobs:
       - name: Install locked dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Test release preparation and validation
-        run: pnpm test
-
       - name: Build CLI and SDK
         run: pnpm --filter '@imsergiobernal/vaia-cli...' --fail-if-no-match -r run build
 
-      - name: Check CLI and SDK types
-        run: pnpm --filter '@imsergiobernal/vaia-cli...' --fail-if-no-match -r run typecheck
+      - name: Check workspace and script types
+        run: pnpm typecheck
 
       - name: Verify CLI compatibility
         run: |

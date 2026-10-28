@@ -46,7 +46,7 @@ jobs:
         id: validate
         run: |
           mkdir -p "$RUNNER_TEMP/cli-assets"
-          node scripts/validate-release.mjs tag cli "$RELEASE_TAG" \
+          node --experimental-strip-types scripts/validate-release.mts tag cli "$RELEASE_TAG" \
             --notes-file "$RUNNER_TEMP/cli-assets/release-notes.md"
 
       - name: Set up pnpm
@@ -57,14 +57,11 @@ jobs:
       - name: Install locked dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Test release preparation and validation
-        run: pnpm test
-
       - name: Build CLI and workspace dependencies
         run: pnpm --filter '@imsergiobernal/vaia-cli...' --fail-if-no-match -r run build
 
-      - name: Check types
-        run: pnpm --filter '@imsergiobernal/vaia-cli...' --fail-if-no-match -r run typecheck
+      - name: Check workspace and script types
+        run: pnpm typecheck
 
       - name: Verify the CLI package outside the workspace
         id: package

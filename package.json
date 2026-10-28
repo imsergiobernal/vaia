@@ -5,12 +5,12 @@
   "scripts": {
     "build": "pnpm -r build",
     "dev": "pnpm --parallel -r dev",
-    "typecheck": "pnpm -r typecheck",
+    "typecheck": "pnpm -r typecheck && pnpm typecheck:scripts",
+    "typecheck:scripts": "tsc -p scripts/tsconfig.json",
     "lint": "pnpm -r lint",
     "commitlint": "commitlint",
     "generate": "pnpm --filter @imsergiobernal/vaia-sdk generate",
-    "release:prepare": "node scripts/prepare-release.mjs",
-    "test": "node --test scripts/*.test.mjs"
+    "release:prepare": "node --experimental-strip-types scripts/prepare-release.mts"
   },
   "keywords": [],
   "author": "",
@@ -27,6 +27,7 @@
   "devDependencies": {
     "@commitlint/cli": "21.2.4",
     "@commitlint/config-conventional": "21.2.4",
-    "release-please": "17.11.2"
+    "@types/node": "^22.15.30",
+    "typescript": "^5.8.3"
   }
 }

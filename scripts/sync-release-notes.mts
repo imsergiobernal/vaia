@@ -1,17 +1,19 @@
 import { createHash } from 'node:crypto';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { isDeepStrictEqual } from 'node:util';
-import { parseReleaseRef } from './validate-release.mjs';
-import { extractReleaseNotes } from './release-notes.mjs';
+import { parseReleaseRef } from './validate-release.mts';
+import { extractReleaseNotes } from './release-notes.mts';
+import {
+  errorMessage, isMainModule, isPullRequest, isRecord, parseJson,
+  type GitHubOptions, type GitHubRequest, type ReleaseNotesContext, type WorkingDirectoryOptions,
+} from './shared.mts';
 
 export const releaseNotesOwner = { login: 'imsergiobernal', id: '20087388', repository: 'imsergiobernal/vaia' };
 const reviewStart = '<!-- vaia-release-notes-sync:start -->';
 const reviewEnd = '<!-- vaia-release-notes-sync:end -->';
-const hash = (value) => createHash('sha256').update(value ?? '').digest('hex');
+const hash = (value: string | null | undefined) => createHash('sha256').update(value ?? '').digest('hex');
 
-export function authorizeReleaseNotes(env) {
+export function authorizeReleaseNotes(env: NodeJS.ProcessEnv) {
   if (env.GITHUB_EVENT_NAME !== 'workflow_dispatch' ||
       env.GITHUB_REPOSITORY !== releaseNotesOwner.repository ||
       env.GITHUB_REF !== 'refs/heads/develop' ||
@@ -21,11 +23,11 @@ export function authorizeReleaseNotes(env) {
   }
 }
 
-function git(cwd, ...args) {
+function git(cwd: string, ...args: string[]) {
   return execFileSync('git', args, { cwd, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] });
 }
 
-export function githubClient(repository, token, fetchImpl = fetch) {
+export function githubClient(repository: string | undefined, token: string | undefined, fetchImpl: typeof fetch = fetch): GitHubRequest {
   if (repository !== releaseNotesOwner.repository) throw new Error('Release notes synchronization is limited to imsergiobernal/vaia.');
   if (!token?.trim()) throw new Error('A GitHub token is required.');
   return async (method, path, body) => {
@@ -36,19 +38,21 @@ export function githubClient(repository, token, fetchImpl = fetch) {
       }, ...(body === undefined ? {} : { body: JSON.stringify(body) }), signal: AbortSignal.timeout(30_000),
     });
     if (!response.ok) throw new Error(`GitHub ${method} ${path} failed (HTTP ${response.status}).`);
-    return response.json();
+    return parseJson(await response.text());
   };
 }
 
-function markerFor(entry) {
+function markerFor(entry: string) {
   const markers = [...entry.matchAll(/^<!-- vaia-release-notes (\{[^\r\n]*\}) -->\r?$/gm)];
   if (markers.length !== 1) throw new Error('The target changelog entry needs exactly one vaia-release-notes provenance marker.');
-  return { marker: markers[0][0], provenance: JSON.parse(markers[0][1]) };
+  const provenance = parseJson(markers[0][1]);
+  if (!isRecord(provenance)) throw new Error('The target changelog entry needs valid release notes provenance.');
+  return { marker: markers[0][0], provenance };
 }
 
-export function releaseNotesContext(pr, { cwd = process.cwd() } = {}) {
+export function releaseNotesContext(pr: unknown, { cwd = process.cwd() }: WorkingDirectoryOptions = {}): ReleaseNotesContext {
   const repository = releaseNotesOwner.repository;
-  if (pr.state !== 'open' || pr.merged || pr.head?.repo?.full_name !== repository || pr.base?.repo?.full_name !== repository || pr.base.ref !== 'main') {
+  if (!isPullRequest(pr) || pr.state !== 'open' || pr.merged || pr.head.repo.full_name !== repository || pr.base.repo.full_name !== repository || pr.base.ref !== 'main') {
     throw new Error('Select an open, unmerged same-repository release PR targeting main.');
   }
   const release = parseReleaseRef(pr.head.ref, 'branch');
@@ -56,13 +60,13 @@ export function releaseNotesContext(pr, { cwd = process.cwd() } = {}) {
     if (!/^[a-f0-9]{40}$/.test(side.sha) || /[\x00-\x20~^:?*\[\\]/.test(side.ref)) throw new Error('Invalid PR ref or commit SHA.');
     git(cwd, 'cat-file', '-e', `${side.sha}^{commit}`);
   }
-  const manifest = JSON.parse(git(cwd, 'show', `${pr.head.sha}:${release.manifest}`));
-  if (manifest.version !== release.version) throw new Error('Release branch manifest must match the target version.');
+  const manifest = parseJson(git(cwd, 'show', `${pr.head.sha}:${release.manifest}`));
+  if (!isRecord(manifest) || manifest.version !== release.version) throw new Error('Release branch manifest must match the target version.');
   const changelog = release.manifest.replace(/package\.json$/, 'CHANGELOG.md');
   const entry = extractReleaseNotes(git(cwd, 'show', `${pr.head.sha}:${changelog}`), release.version);
   const { provenance } = markerFor(entry);
   const candidate = provenance.candidate;
-  if (!/^[a-f0-9]{40}$/.test(candidate ?? '') || candidate === pr.head.sha ||
+  if (typeof candidate !== 'string' || !/^[a-f0-9]{40}$/.test(candidate) || candidate === pr.head.sha ||
       spawnSync('git', ['merge-base', '--is-ancestor', candidate, pr.head.sha], { cwd }).status !== 0) {
     throw new Error('Notes candidate must be an earlier ancestor of the release branch head.');
   }
@@ -80,7 +84,7 @@ export function releaseNotesContext(pr, { cwd = process.cwd() } = {}) {
   return context;
 }
 
-export function validateDraftProvenance(entry, context) {
+export function validateDraftProvenance(entry: string, context: ReleaseNotesContext) {
   const { marker, provenance } = markerFor(entry);
   const expected = { component: context.component, version: context.version, candidate: context.candidateSha, previous_tag: context.previousTag };
   if (!isDeepStrictEqual(provenance, expected)) throw new Error('The drafted notes describe a different candidate, component or previous tag. Draft them again.');
@@ -90,7 +94,7 @@ export function validateDraftProvenance(entry, context) {
   }
 }
 
-export function renderPullRequestBody(body, context, entry) {
+export function renderPullRequestBody(body: string | null | undefined, context: ReleaseNotesContext, entry: string) {
   const original = (body ?? '').trim();
   const start = original.indexOf(reviewStart);
   const end = original.indexOf(reviewEnd);
@@ -104,17 +108,19 @@ export function renderPullRequestBody(body, context, entry) {
   return `${kept ? `${kept}\n\n` : ''}${review}\n`;
 }
 
-export async function syncReleaseNotes(number, { cwd = process.cwd(), env = process.env, request } = {}) {
+export async function syncReleaseNotes(number: number, { cwd = process.cwd(), env = process.env, request }: GitHubOptions = {}) {
   authorizeReleaseNotes(env);
   if (!Number.isSafeInteger(number) || number <= 0) throw new Error('Provide a positive release PR number.');
   request ??= githubClient(env.GITHUB_REPOSITORY, env.GITHUB_TOKEN);
   const pr = await request('GET', `pulls/${number}`);
+  if (!isPullRequest(pr)) throw new Error('Select an open, unmerged same-repository release PR targeting main.');
   const context = releaseNotesContext(pr, { cwd });
   const entry = extractReleaseNotes(git(cwd, 'show', `${context.headSha}:${context.changelog}`), context.version);
   const body = renderPullRequestBody(pr.body, context, entry);
   if (Buffer.byteLength(body) > 60_000) throw new Error('The proposed PR body is too large.');
   const latest = await request('GET', `pulls/${number}`);
-  let fresh;
+  if (!isPullRequest(latest)) throw new Error('The PR changed during synchronization. Rerun after reviewing the latest candidate.');
+  let fresh: ReleaseNotesContext;
   try { fresh = releaseNotesContext(latest, { cwd }); }
   catch (error) { throw new Error('The PR changed during synchronization. Rerun after reviewing the latest candidate.', { cause: error }); }
   if (!isDeepStrictEqual(fresh, context)) throw new Error('The PR changed during synchronization. Rerun after reviewing the latest candidate.');
@@ -123,10 +129,10 @@ export async function syncReleaseNotes(number, { cwd = process.cwd(), env = proc
   return { context, entry, changed };
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+if (isMainModule(import.meta.url)) {
   try {
-    if (process.argv.length !== 3) throw new Error('Usage: node scripts/sync-release-notes.mjs <release-pr-number>');
+    if (process.argv.length !== 3) throw new Error('Usage: node --experimental-strip-types scripts/sync-release-notes.mts <release-pr-number>');
     const result = await syncReleaseNotes(Number(process.argv[2]));
     console.log(`Synchronized ${result.context.component} ${result.context.version} notes for PR #${result.context.number}.`);
-  } catch (error) { console.error(error.message); process.exitCode = 1; }
+  } catch (error) { console.error(errorMessage(error)); process.exitCode = 1; }
 }

@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+import { hasErrorCode, type ReleaseRef, type WorkingDirectoryOptions } from './shared.mts';
 
-export function extractReleaseNotes(changelog, version) {
+export function extractReleaseNotes(changelog: string, version: string): string {
   // Release Please emits either "## [X.Y.Z](compare-url) (date)" or
   // "## X.Y.Z (date)". H3 sections belong to the same release entry.
   const headings = [...changelog.matchAll(/^##[\t ]+(?:\[([^\]\r\n]+)\]|([^\s]+))[^\r\n]*(?:\r?\n|$)/gm)];
@@ -17,13 +18,13 @@ export function extractReleaseNotes(changelog, version) {
   return `${changelog.slice(heading.index, end).trim()}\n`;
 }
 
-export function readReleaseNotes(release, { cwd = process.cwd() } = {}) {
+export function readReleaseNotes(release: ReleaseRef, { cwd = process.cwd() }: WorkingDirectoryOptions = {}) {
   const path = resolve(cwd, dirname(release.manifest), 'CHANGELOG.md');
-  let changelog;
+  let changelog: string;
   try {
     changelog = readFileSync(path, 'utf8');
   } catch (error) {
-    if (error.code === 'ENOENT') {
+    if (hasErrorCode(error, 'ENOENT')) {
       throw new Error(`Missing ${dirname(release.manifest)}/CHANGELOG.md. Prepare the release notes before publishing ${release.tag}.`);
     }
     throw error;
