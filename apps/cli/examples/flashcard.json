@@ -1,0 +1,22 @@
+{
+  "flashcard_image_ids": [],
+  "tags": [],
+  "question_html": [
+    {
+      "text": "<p>¿Cuál es la capital de España?</p>",
+      "is_correct": true
+    }
+  ],
+  "answer_html": [
+    {
+      "text": "<p>Madrid</p>",
+      "is_correct": true
+    },
+    {
+      "text": "<p>Valencia</p>",
+      "is_correct": false
+    }
+  ],
+  "hint_html": [],
+  "solution_html": ""
+}

@@ -1,0 +1,32 @@
+{
+  "name": "vaia",
+  "private": true,
+  "description": "",
+  "scripts": {
+    "build": "pnpm -r build",
+    "dev": "pnpm --parallel -r dev",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "commitlint": "commitlint",
+    "generate": "pnpm --filter @imsergiobernal/vaia-sdk generate",
+    "release:prepare": "node scripts/prepare-release.mjs",
+    "test": "node --test scripts/*.test.mjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "12.6.0",
+      "onFail": "download"
+    }
+  },
+  "packageManager": "pnpm@12.6.0",
+  "type": "module",
+  "devDependencies": {
+    "@commitlint/cli": "21.2.4",
+    "@commitlint/config-conventional": "21.2.4",
+    "release-please": "17.11.2"
+  }
+}

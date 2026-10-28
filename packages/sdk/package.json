@@ -1,0 +1,35 @@
+{
+  "name": "@imsergiobernal/vaia-sdk",
+  "version": "0.1.0",
+  "description": "Typed HTTP client for the Vaia API described by @vaia/openapi.",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/imsergiobernal/vaia.git",
+    "directory": "packages/sdk"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org",
+    "access": "public"
+  },
+  "files": ["dist"],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "generate": "openapi-typescript ../openapi/openapi.yaml -o src/generated/schema.ts",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "openapi-fetch": "^0.14.0"
+  },
+  "devDependencies": {
+    "@vaia/openapi": "workspace:*",
+    "openapi-typescript": "^7.6.1",
+    "typescript": "^5.8.3"
+  }
+}

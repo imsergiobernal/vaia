@@ -1,0 +1,48 @@
+{
+  "name": "@imsergiobernal/vaia-cli",
+  "version": "0.1.0",
+  "description": "Interactive and scriptable CLI for managing Vaia content.",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/imsergiobernal/vaia.git",
+    "directory": "apps/cli"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org",
+    "access": "public"
+  },
+  "bin": {
+    "vaia": "./dist/bin/run.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "oclif": {
+    "bin": "vaia",
+    "dirname": "vaia",
+    "commands": "./dist/commands",
+    "plugins": [
+      "@oclif/plugin-help"
+    ],
+    "topicSeparator": " "
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx src/bin/run.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@clack/prompts": "^0.11.0",
+    "@oclif/core": "^4.5.0",
+    "@oclif/plugin-help": "^6.2.30",
+    "@toon-format/toon": "^4.1.1",
+    "@imsergiobernal/vaia-sdk": "workspace:*",
+    "env-paths": "^3.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.30",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3"
+  }
+}

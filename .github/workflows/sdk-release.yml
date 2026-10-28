@@ -1,0 +1,140 @@
+name: SDK release
+
+on:
+  push:
+    tags:
+      - sdk-v*
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing stable SDK tag to release (for example, sdk-v0.1.0)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sdk-release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build SDK and verify CLI compatibility
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    outputs:
+      tag: ${{ steps.validate.outputs.tag }}
+    env:
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+    steps:
+      - name: Check out the release tag and main history
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: refs/tags/${{ env.RELEASE_TAG }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22'
+          package-manager-cache: false
+
+      - name: Validate stable SDK tag, version and main history
+        id: validate
+        run: |
+          mkdir -p "$RUNNER_TEMP/sdk-assets"
+          node scripts/validate-release.mjs tag sdk "$RELEASE_TAG" \
+            --notes-file "$RUNNER_TEMP/sdk-assets/release-notes.md"
+
+      - name: Set up pnpm from package.json
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+        with:
+          run_install: false
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Test release preparation and validation
+        run: pnpm test
+
+      - name: Build CLI and SDK
+        run: pnpm --filter '@imsergiobernal/vaia-cli...' --fail-if-no-match -r run build
+
+      - name: Check CLI and SDK types
+        run: pnpm --filter '@imsergiobernal/vaia-cli...' --fail-if-no-match -r run typecheck
+
+      - name: Verify CLI compatibility
+        run: |
+          node apps/cli/dist/bin/run.js --help
+          node apps/cli/dist/bin/run.js flashcards list --help
+          node apps/cli/dist/bin/run.js config show
+
+      - name: Verify the SDK package outside the workspace
+        uses: ./.github/actions/verify-sdk
+
+      - name: Upload verified SDK assets
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: sdk-release
+          path: ${{ runner.temp }}/sdk-assets/*
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    name: Stage SDK for approval and draft GitHub Release
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - name: Set up Node.js and npm registry
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+          package-manager-cache: false
+          registry-url: https://registry.npmjs.org
+          scope: '@imsergiobernal'
+
+      - name: Install npm with staged publishing support
+        run: npm install --global npm@11.19.0 --registry https://registry.npmjs.org --ignore-scripts
+
+      - name: Download verified SDK assets
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: sdk-release
+          path: release-assets
+
+      - name: Stage the verified SDK package for manual approval
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          cd release-assets
+          sha256sum --check SHA256SUMS
+          npm stage publish ./*.tgz --registry https://registry.npmjs.org --access public --ignore-scripts
+          cat <<'MARKDOWN' >> "$GITHUB_STEP_SUMMARY"
+          ## SDK awaiting npm approval
+
+          The verified SDK package is staged; this run does not publish it to npm.
+          Open [npm Staged Packages](https://www.npmjs.com/settings/imsergiobernal/staged-packages),
+          review the package name and version, then select **Approve** and complete 2FA.
+          Approve the SDK before triggering a CLI release that depends on it.
+          After npm approval, publish the matching draft in GitHub Releases with **Set as latest release** disabled.
+          MARKDOWN
+
+      - name: Create draft SDK GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ needs.build.outputs.tag }}
+        run: |
+          cd release-assets
+          gh release create "$RELEASE_TAG" ./*.tgz SHA256SUMS \
+            --draft \
+            --verify-tag \
+            --title "Vaia SDK $RELEASE_TAG" \
+            --notes-file release-notes.md \
+            --latest=false

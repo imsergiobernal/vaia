@@ -1,0 +1,901 @@
+openapi: 3.0.3
+
+info:
+  title: StudySmarter Flashcards API
+  version: 1.0.0
+  description: >-
+    Especificación inferida a partir de peticiones fetch observadas contra
+    prod.studysmarter.de. No procede de documentación oficial y algunos detalles
+    de las respuestas o validaciones del servidor pueden variar.
+
+servers:
+  - url: https://prod.studysmarter.de
+    description: Producción
+
+tags:
+  - name: Flashcards
+    description: Operaciones sobre flashcards de un study set.
+  - name: Study sets
+    description: Operaciones sobre study sets y sus subsets.
+  - name: Tags
+    description: Operaciones sobre etiquetas de un study set.
+
+paths:
+  /studysets/:
+    get:
+      tags:
+        - Study sets
+      summary: Listar studysets raíz
+      operationId: listStudysets
+      description: 'La petición observada envía `Accept: application/json; version=2.0`.'
+      security:
+        - tokenAuth: []
+      parameters:
+        - in: query
+          name: is_archived
+          schema:
+            type: boolean
+            default: false
+          description: Indica si se incluyen los studysets archivados.
+      responses:
+        '200':
+          description: Lista de studysets y contadores por estado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudysetList'
+        '401':
+          description: Token ausente o inválido.
+  /studysets/{studyset_id}/subsets/:
+    get:
+      tags:
+        - Study sets
+      summary: Obtener subsets de un study set
+      operationId: listStudysetSubsets
+      description: 'La petición observada envía `Accept: application/json; version=2.0`.'
+      security:
+        - tokenAuth: []
+      parameters:
+        - $ref: '#/components/parameters/StudysetId'
+        - in: query
+          name: include_progress
+          schema:
+            type: boolean
+            default: true
+          description: Incluye contadores de progreso y flashcards en cada subset.
+      responses:
+        '200':
+          description: Lista de subsets del study set.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/StudysetSubset'
+        '401':
+          description: Token ausente o inválido.
+        '404':
+          description: Study set no encontrado.
+  /studysets/{studyset_id}/tags/:
+    get:
+      tags:
+        - Tags
+      summary: Listar etiquetas de un study set
+      operationId: listStudysetTags
+      security:
+        - tokenAuth: []
+      parameters:
+        - $ref: '#/components/parameters/StudysetId'
+        - in: query
+          name: content_filter
+          schema:
+            type: string
+            enum:
+              - flashcards
+          description: Filtra etiquetas por tipo de contenido; su efecto no se observó en el studyset consultado.
+      responses:
+        '200':
+          description: Etiquetas del study set y elementos que no tienen etiquetas.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudysetTagsResponse'
+        '401':
+          description: Token ausente o inválido.
+        '404':
+          description: Study set no encontrado.
+    post:
+      tags:
+        - Tags
+      summary: Crear una etiqueta
+      operationId: createStudysetTag
+      security:
+        - tokenAuth: []
+      parameters:
+        - $ref: '#/components/parameters/StudysetId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StudysetTagPayload'
+            example:
+              name: prueba
+              colour: -1
+      responses:
+        '200':
+          description: Etiqueta creada correctamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudysetTag'
+        '201':
+          description: Etiqueta creada correctamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudysetTag'
+        '400':
+          description: Petición inválida.
+        '401':
+          description: Token ausente o inválido.
+        '404':
+          description: Study set no encontrado.
+  /studysets/{studyset_id}/tags/{tag_id}/:
+    patch:
+      tags:
+        - Tags
+      summary: Actualizar una etiqueta
+      operationId: updateStudysetTag
+      security:
+        - tokenAuth: []
+      parameters:
+        - $ref: '#/components/parameters/StudysetId'
+        - $ref: '#/components/parameters/TagId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StudysetTagPayload'
+            example:
+              name: pruebaa
+              colour: -1
+      responses:
+        '200':
+          description: Etiqueta actualizada correctamente.
+        '400':
+          description: Petición inválida.
+        '401':
+          description: Token ausente o inválido.
+        '404':
+          description: Study set o etiqueta no encontrados.
+    delete:
+      tags:
+        - Tags
+      summary: Eliminar una etiqueta
+      operationId: deleteStudysetTag
+      security:
+        - tokenAuth: []
+      parameters:
+        - $ref: '#/components/parameters/StudysetId'
+        - $ref: '#/components/parameters/TagId'
+      responses:
+        '204':
+          description: Etiqueta eliminada correctamente.
+        '200':
+          description: Operación completada correctamente.
+        '401':
+          description: Token ausente o inválido.
+        '404':
+          description: Study set o etiqueta no encontrados.
+  /studysets/{studyset_id}/flashcards/:
+    get:
+      tags:
+        - Flashcards
+      summary: Obtener una página de flashcards
+      operationId: listFlashcards
+      security:
+        - tokenAuth: []
+      parameters:
+        - $ref: '#/components/parameters/StudysetId'
+        - in: query
+          name: search
+          schema:
+            type: string
+            default: ''
+          description: Texto de búsqueda.
+        - in: query
+          name: ratings
+          schema:
+            type: string
+            default: bad,ok,good,perfect,unrated
+          description: Lista de valoraciones separadas por comas.
+        - in: query
+          name: visibility
+          schema:
+            type: string
+            default: visible
+        - in: query
+          name: created_by
+          schema:
+            type: string
+            default: anybody
+        - in: query
+          name: order
+          schema:
+            type: string
+            default: anti-chronological
+        - in: query
+          name: tag_ids
+          style: form
+          explode: false
+          schema:
+            type: array
+            items:
+              type: integer
+              format: int64
+          description: Lista de IDs de etiqueta separadas por comas.
+        - in: query
+          name: cursor
+          schema:
+            type: string
+          description: Cursor opaco devuelto por una página anterior.
+        - in: query
+          name: quantity
+          schema:
+            type: integer
+            default: 20
+          description: Número máximo de flashcards solicitado para esta página.
+      responses:
+        '200':
+          description: Página de flashcards con contador, enlaces de navegación y resultados.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FlashcardPage'
+        '400':
+          description: Parámetros inválidos.
+        '401':
+          description: Token ausente o inválido.
+        '404':
+          description: Study set no encontrado.
+    post:
+      tags:
+        - Flashcards
+      summary: Crear una flashcard
+      operationId: createFlashcard
+      security:
+        - tokenAuth: []
+      parameters:
+        - $ref: '#/components/parameters/StudysetId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FlashcardPayload'
+            example:
+              flashcard_image_ids: []
+              tags: []
+              question_html:
+                - text: "<p>pregunta?</p>"
+                  is_correct: true
+              answer_html:
+                - text: "<p>respuesta?</p>"
+                  is_correct: true
+                - text: "<p>mala respuesta?</p>"
+                  is_correct: false
+              hint_html: []
+              solution_html: ''
+      responses:
+        '201':
+          description: Flashcard creada correctamente.
+        '200':
+          description: Operación completada correctamente.
+        '400':
+          description: Petición inválida.
+        '401':
+          description: Token ausente o inválido.
+        '404':
+          description: Study set no encontrado.
+
+  /studysets/{studyset_id}/flashcards/{flashcard_id}/:
+    patch:
+      tags:
+        - Flashcards
+      summary: Actualizar una flashcard
+      operationId: updateFlashcard
+      security:
+        - tokenAuth: []
+      parameters:
+        - $ref: '#/components/parameters/StudysetId'
+        - $ref: '#/components/parameters/FlashcardId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FlashcardPayload'
+            example:
+              flashcard_image_ids: []
+              tags: []
+              question_html:
+                - text: "<p>pregunta?</p>"
+                  is_correct: true
+              answer_html:
+                - text: "<p>respuesta?</p>"
+                  is_correct: true
+                - text: "<p>mala respuesta?</p>"
+                  is_correct: false
+              hint_html: []
+              solution_html: ''
+      responses:
+        '200':
+          description: Flashcard actualizada correctamente.
+        '400':
+          description: Petición inválida.
+        '401':
+          description: Token ausente o inválido.
+      '404':
+        description: Study set o flashcard no encontrados.
+
+    delete:
+      tags:
+        - Flashcards
+      summary: Eliminar una flashcard
+      operationId: deleteFlashcard
+      security:
+        - tokenAuth: []
+      parameters:
+        - $ref: '#/components/parameters/StudysetId'
+        - $ref: '#/components/parameters/FlashcardId'
+      requestBody:
+        required: false
+        description: >-
+          Body observado en la petición original. Puede que el servidor no lo
+          necesite porque el ID ya está incluido en la URL.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeleteFlashcardPayload'
+            example:
+              id: 1129037604
+      responses:
+        '204':
+          description: Flashcard eliminada correctamente sin contenido de respuesta.
+        '200':
+          description: Flashcard eliminada correctamente.
+        '400':
+          description: Petición inválida.
+        '401':
+          description: Token ausente o inválido.
+        '404':
+          description: Study set o flashcard no encontrados.
+
+  /studysets/{studyset_id}/flashcards/bulk/:
+    patch:
+      tags:
+        - Flashcards
+      summary: Mover flashcards a otro study set
+      operationId: moveFlashcards
+      description: El studyset_id de la ruta identifica el study set de origen.
+      security:
+        - tokenAuth: []
+      parameters:
+        - $ref: '#/components/parameters/StudysetId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MoveFlashcardsPayload'
+            example:
+              destination_studyset_id: 71451371
+              flashcard_ids:
+                - 1135003712
+      responses:
+        '200':
+          description: Flashcards movidas correctamente.
+        '204':
+          description: Flashcards movidas correctamente sin cuerpo de respuesta.
+        '400':
+          description: Petición inválida.
+        '401':
+          description: Token ausente o inválido.
+        '404':
+          description: Study set de origen, destino o flashcard no encontrados.
+
+components:
+  securitySchemes:
+    tokenAuth:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: 'Usa el formato exacto: `Token TU_TOKEN`.'
+
+  parameters:
+    StudysetId:
+      name: studyset_id
+      in: path
+      required: true
+      description: ID del study set.
+      schema:
+        type: integer
+        format: int64
+      example: 71434395
+    FlashcardId:
+      name: flashcard_id
+      in: path
+      required: true
+      description: ID de la flashcard.
+      schema:
+        type: integer
+        format: int64
+      example: 1129037604
+    TagId:
+      name: tag_id
+      in: path
+      required: true
+      description: ID de la etiqueta.
+      schema:
+        type: integer
+        format: int64
+
+  schemas:
+    Studyset:
+      type: object
+      description: Studyset devuelto por la API; se preservan campos adicionales del servidor.
+      additionalProperties: true
+      properties:
+        id:
+          type: integer
+          format: int64
+        parent_studyset_id:
+          type: integer
+          format: int64
+          nullable: true
+        name:
+          type: string
+        colorId:
+          type: integer
+        shared:
+          type: boolean
+        flashcard_count:
+          type: integer
+        subtopic_count:
+          type: integer
+        archived:
+          type: boolean
+        type:
+          type: string
+      required:
+        - id
+        - name
+    StudysetList:
+      type: object
+      additionalProperties: true
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Studyset'
+        counts:
+          type: object
+          additionalProperties: true
+          properties:
+            active:
+              type: integer
+            archived:
+              type: integer
+            marked_for_deletion:
+              type: integer
+            created:
+              type: integer
+      required:
+        - results
+    StudysetSubset:
+      type: object
+      description: Subset devuelto por el endpoint; se preservan campos adicionales del servidor.
+      additionalProperties: true
+      properties:
+        id:
+          type: integer
+          format: int64
+        parent_studyset_id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        colorId:
+          type: integer
+        shared:
+          type: boolean
+        creator_id:
+          type: integer
+          format: int64
+        flashcard_count:
+          type: integer
+        flashcard_bad_count:
+          type: integer
+        flashcard_medium_count:
+          type: integer
+        flashcard_ok_count:
+          type: integer
+        flashcard_good_count:
+          type: integer
+        flashcard_trash_count:
+          type: integer
+        flashcard_hidden_count:
+          type: integer
+        flashcard_unseen_count:
+          type: integer
+        flashcard_unrated_count:
+          type: integer
+        flashcard_perfect_count:
+          type: integer
+        learned_count:
+          type: integer
+        unlearned_count:
+          type: integer
+        relearning_count:
+          type: integer
+        mastered_count:
+          type: integer
+        description:
+          type: string
+        subsets:
+          type: array
+          items:
+            type: integer
+            format: int64
+        type:
+          type: string
+        archived:
+          type: boolean
+      required:
+        - id
+        - parent_studyset_id
+        - name
+    FlashcardPayload:
+      type: object
+      properties:
+        flashcard_image_ids:
+          type: array
+          description: IDs de imágenes asociadas a la flashcard.
+          items:
+            type: integer
+            format: int64
+          default: []
+        tags:
+          type: array
+          description: >-
+            IDs de las etiquetas asociadas a la flashcard.
+          items:
+            type: integer
+            format: int64
+          default: []
+        question_html:
+          type: array
+          description: Bloques HTML que forman la pregunta.
+          items:
+            $ref: '#/components/schemas/FlashcardHtmlOption'
+        answer_html:
+          type: array
+          description: >-
+            Respuestas de la flashcard. Puede contener varias opciones y usar
+            `is_correct` para distinguir respuestas correctas e incorrectas.
+          items:
+            $ref: '#/components/schemas/FlashcardHtmlOption'
+        hint_html:
+          type: array
+          description: >-
+            Pistas de la flashcard. La estructura interna no puede inferirse
+            con certeza porque en los ejemplos observados siempre está vacía.
+          items: {}
+          default: []
+        solution_html:
+          type: string
+          description: Solución adicional en HTML.
+          default: ''
+      required:
+        - flashcard_image_ids
+        - tags
+        - question_html
+        - answer_html
+        - hint_html
+        - solution_html
+      example:
+        flashcard_image_ids: []
+        tags: []
+        question_html:
+          - text: "<p>pregunta?</p>"
+            is_correct: true
+        answer_html:
+          - text: "<p>respuesta?</p>"
+            is_correct: true
+          - text: "<p>mala respuesta?</p>"
+            is_correct: false
+        hint_html: []
+        solution_html: ''
+    FlashcardHtmlOption:
+        type: object
+        properties:
+          text:
+            type: string
+            description: Contenido HTML del bloque.
+            example: "<p>respuesta?</p>"
+          is_correct:
+            type: boolean
+            description: Indica si la opción se considera correcta.
+            example: true
+        required:
+          - text
+          - is_correct
+    StudysetTagPayload:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Nombre de la etiqueta.
+        colour:
+          type: integer
+          description: Identificador de color de la etiqueta.
+      required:
+        - name
+        - colour
+    StudysetTag:
+      type: object
+      description: Etiqueta devuelta por el endpoint de tags; se preservan campos adicionales.
+      additionalProperties: true
+      properties:
+        id:
+          type: integer
+          format: int64
+        flashcards_count:
+          type: integer
+        textbook_exercises_count:
+          type: integer
+        studyset:
+          type: integer
+          format: int64
+        creator:
+          type: integer
+          format: int64
+        name:
+          type: string
+        colour:
+          type: integer
+        created:
+          type: string
+          format: date-time
+        updated:
+          type: string
+          format: date-time
+        partner_tag:
+          type: boolean
+      required:
+        - id
+        - name
+        - colour
+    StudysetTagsResponse:
+      type: object
+      description: Etiquetas aplicadas al study set y conteo de elementos sin etiquetar.
+      properties:
+        all_parent_tags:
+          type: array
+          items:
+            $ref: '#/components/schemas/StudysetTag'
+        studyset_tags:
+          type: array
+          items:
+            $ref: '#/components/schemas/StudysetTag'
+        untagged_items_count:
+          type: integer
+      required:
+        - all_parent_tags
+        - studyset_tags
+        - untagged_items_count
+    FlashcardPage:
+      type: object
+      description: Respuesta paginada devuelta por el endpoint de flashcards.
+      properties:
+        count:
+          type: integer
+          format: int64
+          description: Número total de flashcards que coinciden con los filtros.
+        next:
+          type: string
+          nullable: true
+          format: uri
+          description: URL de la página siguiente, o null si no hay más resultados.
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          description: URL de la página anterior, o null si es la primera página.
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/FlashcardListItem'
+      required:
+      - count
+      - next
+      - previous
+      - results
+
+    MoveFlashcardsPayload:
+      type: object
+      description: Study set de destino y flashcards que se deben mover desde el study set de la ruta.
+      properties:
+        destination_studyset_id:
+          type: integer
+          format: int64
+        flashcard_ids:
+          type: array
+          minItems: 1
+          items:
+            type: integer
+            format: int64
+      required:
+        - destination_studyset_id
+        - flashcard_ids
+
+    FlashcardListItem:
+      type: object
+      description: Flashcard devuelta en la lista. Las propiedades adicionales se conservan porque el formato del servidor puede evolucionar.
+      additionalProperties: true
+      properties:
+        id:
+          type: integer
+          format: int64
+        creator:
+          type: integer
+          format: int64
+          nullable: true
+        slide_number:
+          type: integer
+          nullable: true
+        answer_html:
+          type: array
+          items:
+            $ref: '#/components/schemas/FlashcardHtmlOption'
+        question_html:
+          type: array
+          items:
+            $ref: '#/components/schemas/FlashcardHtmlOption'
+        hint_html:
+          type: array
+          items:
+            $ref: '#/components/schemas/FlashcardHtmlOption'
+        solution_html:
+          type: string
+        flashcard_images:
+          type: array
+          items: {}
+        partner_logo:
+          type: string
+          nullable: true
+        original_studyset_id:
+          type: integer
+          format: int64
+          nullable: true
+        is_reference:
+          type: boolean
+        slideset_id:
+          type: integer
+          format: int64
+          nullable: true
+        slideset_name:
+          type: string
+          nullable: true
+        flashcard_image_ids:
+          type: array
+          nullable: true
+          items:
+            type: integer
+            format: int64
+        community_applied_tag_ids:
+          type: array
+          items:
+            type: integer
+            format: int64
+        studysets:
+          type: array
+          items:
+            type: integer
+            format: int64
+        is_type_answer:
+          type: boolean
+        ai_generated:
+          type: boolean
+          nullable: true
+        slideset_studyset_id:
+          type: integer
+          format: int64
+          nullable: true
+        created:
+          type: string
+          format: date-time
+        updated:
+          type: string
+          format: date-time
+        originally_from_sso:
+          type: boolean
+        original_studyset_partner_logo:
+          type: string
+          nullable: true
+        permissions:
+          type: object
+          additionalProperties:
+            type: boolean
+        summary_id:
+          type: integer
+          format: int64
+          nullable: true
+        link_source_id:
+          type: integer
+          format: int64
+          nullable: true
+        original_studyset_name:
+          type: string
+          nullable: true
+        original_studyset_subject_id:
+          type: integer
+          format: int64
+          nullable: true
+        original_studyset_consumer_count:
+          type: integer
+          format: int64
+          nullable: true
+        original_studyset_flashcard_count:
+          type: integer
+          format: int64
+          nullable: true
+        tags:
+          type: array
+          items:
+            type: integer
+            format: int64
+        annotation_ids:
+          type: array
+          items:
+            type: integer
+            format: int64
+        state:
+          type: integer
+        priority:
+          type: number
+        green_date:
+          type: string
+          format: date-time
+          nullable: true
+        spaced_repetition:
+          type: object
+          nullable: true
+          additionalProperties: true
+      updated_tags:
+        type: string
+        nullable: true
+        format: date-time
+        rating:
+          type: string
+          enum:
+            - bad
+            - ok
+            - good
+            - perfect
+            - unrated
+        is_hidden:
+          type: boolean
+      required:
+        - id
+
+    DeleteFlashcardPayload:
+        type: object
+        properties:
+          id:
+            type: integer
+            format: int64
+            description: ID de la flashcard que se va a eliminar.
+            example: 1129037604

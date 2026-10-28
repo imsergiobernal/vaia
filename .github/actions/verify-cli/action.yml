@@ -1,0 +1,44 @@
+name: Verify CLI package
+description: Pack the CLI and verify its npm installation and executable outside the workspace.
+
+outputs:
+  sdk_dependency:
+    description: Exact SDK dependency required by the packed CLI.
+    value: ${{ steps.verify.outputs.sdk_dependency }}
+
+runs:
+  using: composite
+  steps:
+    - name: Pack the CLI and its local SDK dependency
+      shell: bash
+      run: |
+        mkdir -p "$RUNNER_TEMP/cli-assets" "$RUNNER_TEMP/cli-dependencies"
+        pnpm --filter @imsergiobernal/vaia-cli pack --pack-destination "$RUNNER_TEMP/cli-assets"
+        pnpm --filter @imsergiobernal/vaia-sdk pack --pack-destination "$RUNNER_TEMP/cli-dependencies"
+
+    - name: Install and verify the packed CLI
+      id: verify
+      shell: bash
+      run: |
+        archive="$(find "$RUNNER_TEMP/cli-assets" -maxdepth 1 -name '*.tgz' -print -quit)"
+        sdk_archive="$(find "$RUNNER_TEMP/cli-dependencies" -maxdepth 1 -name '*.tgz' -print -quit)"
+        test -n "$archive"
+        test -n "$sdk_archive"
+        mkdir -p "$RUNNER_TEMP/cli-package-smoke"
+        cd "$RUNNER_TEMP/cli-package-smoke"
+        npm install --ignore-scripts --no-audit --no-fund "$sdk_archive" "$archive"
+        node --input-type=module <<'NODE'
+        import assert from 'node:assert/strict';
+        import { appendFileSync, readFileSync } from 'node:fs';
+        const cli = JSON.parse(readFileSync('node_modules/@imsergiobernal/vaia-cli/package.json', 'utf8'));
+        const sdk = JSON.parse(readFileSync('node_modules/@imsergiobernal/vaia-sdk/package.json', 'utf8'));
+        assert.equal(cli.name, '@imsergiobernal/vaia-cli');
+        assert.notEqual(cli.private, true);
+        assert.equal(cli.dependencies['@imsergiobernal/vaia-sdk'], sdk.version);
+        appendFileSync(process.env.GITHUB_OUTPUT, `sdk_dependency=@imsergiobernal/vaia-sdk@${sdk.version}\n`);
+        NODE
+        ./node_modules/.bin/vaia --help
+        ./node_modules/.bin/vaia flashcards list --help
+        ./node_modules/.bin/vaia config show
+        cd "$RUNNER_TEMP/cli-assets"
+        sha256sum ./*.tgz > SHA256SUMS
