@@ -48,6 +48,6 @@ const client = createClient({
 `sdk-vX.Y.Z` stages the verified npm tarball for manual approval with 2FA and
 attaches it with `SHA256SUMS` to a draft GitHub Release. Approve the SDK in npm
 before staging a CLI release that depends on it, then publish the SDK's GitHub
-Release draft with **Set as latest release** disabled. CI tests that the package
-can be installed and used outside this workspace without the private OpenAPI
+Release draft with **Set as latest release** disabled. The SDK release workflow
+tests that the package can be installed and used outside this workspace without the private OpenAPI
 package. See [the release procedure](../../docs/releasing.md).

@@ -16,11 +16,13 @@ runs:
         archive="$(find "$RUNNER_TEMP/sdk-assets" -maxdepth 1 -name '*.tgz' -print -quit)"
         test -n "$archive"
         mkdir -p "$RUNNER_TEMP/sdk-smoke"
-        cp scripts/smoke-sdk.mjs scripts/sdk-consumer.mts "$RUNNER_TEMP/sdk-smoke/"
+        cp scripts/smoke-sdk.mts scripts/sdk-consumer.mts "$RUNNER_TEMP/sdk-smoke/"
         cd "$RUNNER_TEMP/sdk-smoke"
         npm install --ignore-scripts --no-audit --no-fund "$archive"
-        node smoke-sdk.mjs
-        node "$GITHUB_WORKSPACE/packages/sdk/node_modules/typescript/bin/tsc" \
-          --noEmit --strict --module NodeNext --moduleResolution NodeNext --target ES2022 sdk-consumer.mts
+        node --experimental-strip-types smoke-sdk.mts
+        node "$GITHUB_WORKSPACE/node_modules/typescript/bin/tsc" \
+          --noEmit --strict --module NodeNext --moduleResolution NodeNext --target ES2022 \
+          --verbatimModuleSyntax --erasableSyntaxOnly --types node \
+          --typeRoots "$GITHUB_WORKSPACE/node_modules/@types" smoke-sdk.mts sdk-consumer.mts
         cd "$RUNNER_TEMP/sdk-assets"
         sha256sum ./*.tgz > SHA256SUMS

@@ -47,4 +47,4 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
           PREPARATION_PR: ${{ inputs.pull_request }}
-        run: node scripts/sync-release-notes.mjs "$PREPARATION_PR"
+        run: node --experimental-strip-types scripts/sync-release-notes.mts "$PREPARATION_PR"

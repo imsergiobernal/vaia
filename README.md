@@ -5,7 +5,6 @@
 Use the interactive and scriptable CLI from your terminal, or the typed ESM SDK
 from your Node.js application. Both are published to the public npm registry.
 
-[![CI](https://github.com/imsergiobernal/vaia/actions/workflows/ci.yml/badge.svg)](https://github.com/imsergiobernal/vaia/actions/workflows/ci.yml)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D22-blue?logo=node.js&logoColor=white)](https://nodejs.org/)
 [![pnpm](https://img.shields.io/badge/pnpm-12.6.0-f9b14e?logo=pnpm&logoColor=black)](https://pnpm.io/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)

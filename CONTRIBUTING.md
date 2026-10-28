@@ -6,17 +6,19 @@ is covered separately in the [release and hotfix guide](docs/releasing.md).
 
 ## Table of contents
 
-- [Development](#development)
-  - [Prerequisites](#prerequisites)
-  - [Setup](#setup)
-  - [Running the CLI](#running-the-cli)
-- [Repository layout](#repository-layout)
-- [Workspace scripts](#workspace-scripts)
-- [Regenerating SDK types](#regenerating-sdk-types)
-- [Code conventions](#code-conventions)
-- [Commit messages](#commit-messages)
-- [Tests and pull requests](#tests-and-pull-requests)
-- [Releases and hotfixes](#releases-and-hotfixes)
+- [Contributing to Vaia](#contributing-to-vaia)
+  - [Table of contents](#table-of-contents)
+  - [Development](#development)
+    - [Prerequisites](#prerequisites)
+    - [Setup](#setup)
+    - [Running the CLI](#running-the-cli)
+  - [Repository layout](#repository-layout)
+  - [Workspace scripts](#workspace-scripts)
+  - [Regenerating SDK types](#regenerating-sdk-types)
+  - [Code conventions](#code-conventions)
+  - [Commit messages](#commit-messages)
+  - [Validation and pull requests](#validation-and-pull-requests)
+  - [Releases and hotfixes](#releases-and-hotfixes)
 
 ## Development
 
@@ -36,7 +38,6 @@ cd vaia
 pnpm install --frozen-lockfile
 pnpm build
 pnpm typecheck
-pnpm test
 ```
 
 Run workspace commands from the repository root. The build compiles the SDK,
@@ -83,10 +84,10 @@ flowchart LR
 | [apps/cli](apps/cli/) | oclif commands under `src/commands/`, the interactive menu under `src/interactive/`, and local configuration. Depends on the SDK via `workspace:*`. |
 | [packages/sdk](packages/sdk/) | Typed ESM HTTP client built on `openapi-fetch`, resource methods and generated OpenAPI schema types. |
 | [packages/openapi](packages/openapi/) | OpenAPI 3.0 contract in `openapi.yaml`; workspace-only and never published. |
-| [scripts](scripts/) | Release preparation, notes validation/synchronization, publication validation and notes extraction, with Node.js tests. |
-| [.github/workflows](.github/workflows/) | CI, single-branch release preparation with automatic PR drafts, owner-only manual synchronization fallback and tag-triggered CLI/SDK publication. |
+| [scripts](scripts/) | Release preparation, notes validation/synchronization, publication validation and notes extraction. |
+| [.github/workflows](.github/workflows/) | Owner-only manual release-note synchronization and tag-triggered CLI/SDK publication. |
 | [.github/actions](.github/actions/) | Verification of packed CLI and SDK packages outside the workspace. |
-| [docs/releasing.md](docs/releasing.md) | Release and hotfix procedure, Git Flow Next setup and preparation bot configuration. |
+| [docs/releasing.md](docs/releasing.md) | Local release and hotfix procedure, Git Flow Next setup and publication. |
 
 ## Workspace scripts
 
@@ -98,8 +99,8 @@ flowchart LR
 | `pnpm lint` | Currently fails because no package defines a `lint` script; no source linter is configured. |
 | `pnpm commitlint --edit <commit-message-file>` | Validate a commit message against the repository's Conventional Commits rules. |
 | `pnpm generate` | Regenerate SDK schema types from the OpenAPI contract. |
-| `pnpm test` | Run `node --test` over `scripts/*.test.mjs`. |
-| `pnpm release:prepare <branch>` | Generate an automatic draft and, if missing, the initial changelog entry; see the [release guide](docs/releasing.md) for branches and required credentials. |
+| `pnpm typecheck:scripts` | Check release tooling without emitting JavaScript. |
+| `pnpm release:prepare <branch>` | Generate the initial changelog entry from local commits and tags; see the [release guide](docs/releasing.md). |
 
 ## Regenerating SDK types
 
@@ -170,7 +171,7 @@ You can also pipe a message into `pnpm commitlint`. Validation checks the messag
 format, not whether scopes match changed files. Apply the convention to new
 messages without rewriting existing history.
 
-## Tests and pull requests
+## Validation and pull requests
 
 Continue new features on `develop`; release and hotfix branches are for
 corrections and package preparation. Use a Conventional Commit title for the PR,
@@ -181,21 +182,22 @@ Before pushing, run:
 ```sh
 pnpm build
 pnpm typecheck
-pnpm test
 ```
 
-The test suite uses Node.js's built-in test runner. Tests live in `scripts/` as
-`*.test.mjs`; add or update them when changing release tooling. There is no
-separate unit, integration or end-to-end suite.
+Scripts run without a compilation step using `node --experimental-strip-types`,
+which supports the minimum development version of Node.js 22.12. Keep relative
+imports explicit with `.mts` and use `import type` for types. `pnpm typecheck`
+includes release tooling; `pnpm typecheck:scripts` checks it on its own.
+The two isolated SDK consumers are checked against the packed SDK by the
+`verify-sdk` action.
 
-CI also runs CLI smoke checks and verifies packed CLI/SDK tarballs outside the
-workspace using the actions under `.github/actions/`. Wait for CI to pass before
-merging.
+The release workflows also run CLI smoke checks and verify packed CLI/SDK
+tarballs outside the workspace using the actions under `.github/actions/`.
 
 ## Releases and hotfixes
 
 CLI and SDK have independent versions. Follow [docs/releasing.md](docs/releasing.md)
-for branch naming, component version preparation, Git Flow Next, Release Please
+for branch naming, local component and changelog preparation, Git Flow Next
 and publication. Each release PR goes directly from its release branch to `main`.
 After stabilization, draft notes in your personal Codex session
 and follow the [release notes procedure](docs/releasing.md#draft-final-release-notes).

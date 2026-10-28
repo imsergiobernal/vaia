@@ -4,8 +4,8 @@ The maintainer is `imsergiobernal` (GitHub user ID `20087388`). Start this task
 from your personal Codex account with the connected Vaia repository. Repository
 prompts and provenance metadata are not an authentication mechanism.
 
-For an open same-repository PR from `release/<component>-vX.Y.Z` or
-`hotfix/<component>-vX.Y.Z` to `main`:
+After preparing the changelog locally, open a same-repository PR from
+`release/<component>-vX.Y.Z` or `hotfix/<component>-vX.Y.Z` to `main`:
 
 1. Capture the release branch head as the stabilization candidate, its component
    and version. Confirm complete history and tags. Select the nearest reachable
