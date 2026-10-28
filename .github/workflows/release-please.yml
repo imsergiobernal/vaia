@@ -65,6 +65,16 @@ jobs:
           permission-pull-requests: write
           permission-issues: write
 
+      - name: Verify the release PR base exists
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if ! gh api "repos/$GH_REPO/branches/main" --silent; then
+            echo '::error::The GitHub App cannot access the main branch. Create or restore main before preparing a release.'
+            exit 1
+          fi
+
       - name: Stop if this release PR was already merged
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
