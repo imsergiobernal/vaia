@@ -1,0 +1,102 @@
+name: Sync develop after release
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      pull_request:
+        description: Merged release or hotfix PR number
+        required: true
+        type: number
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sync-develop
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    if: >-
+      github.repository == 'imsergiobernal/vaia' &&
+      ((github.event_name == 'pull_request' && github.event.pull_request.merged == true &&
+        github.event.pull_request.head.repo.full_name == github.repository &&
+        (startsWith(github.event.pull_request.head.ref, 'release/') ||
+         startsWith(github.event.pull_request.head.ref, 'hotfix/'))) ||
+       (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/develop' &&
+        github.actor_id == '20087388' && github.actor == 'imsergiobernal' &&
+        github.triggering_actor == 'imsergiobernal'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Create repository-scoped GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
+        with:
+          app-id: ${{ vars.RELEASE_PLEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_PLEASE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+          permission-contents: write
+          permission-pull-requests: read
+
+      - name: Check out trusted repository tools
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && 'develop' || 'main' }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate merged PR and main history
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number || inputs.pull_request }}
+        run: |
+          if [[ ! "$PR_NUMBER" =~ ^[1-9][0-9]*$ ]]; then
+            echo '::error::A valid PR number is required.'
+            exit 1
+          fi
+          gh api "repos/$GH_REPO/pulls/$PR_NUMBER" > "$RUNNER_TEMP/pr.json"
+          merge_sha="$(node scripts/validate-sync-pr.mjs "$RUNNER_TEMP/pr.json" "$GH_REPO")"
+          git fetch origin main develop
+          if ! git merge-base --is-ancestor "$merge_sha" origin/main; then
+            echo '::error::The PR merge commit is not an ancestor of main.'
+            exit 1
+          fi
+          read -r -a commit_and_parents <<< "$(git rev-list --parents -n 1 "$merge_sha")"
+          if [[ "${#commit_and_parents[@]}" -ne 3 ]]; then
+            echo '::error::The release PR must have been merged using a merge commit.'
+            exit 1
+          fi
+
+      - name: Install verified Git Flow Next
+        run: |
+          archive="$RUNNER_TEMP/git-flow.tar.gz"
+          curl --fail --location --retry 3 -o "$archive" https://github.com/gittower/git-flow-next/releases/download/v2.1.0/git-flow-next-v2.1.0-linux-amd64.tar.gz
+          echo "e335b5818f2b2f820c17844c194030d0db78f3cdfa9bb999fcb9ce092ba9ecd2  $archive" | sha256sum --check
+          mkdir -p "$RUNNER_TEMP/git-flow-bin"
+          tar -xzf "$archive" -C "$RUNNER_TEMP/git-flow-bin" git-flow
+          echo "$RUNNER_TEMP/git-flow-bin" >> "$GITHUB_PATH"
+
+      - name: Update develop from main
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git config core.hooksPath /dev/null
+          git switch -C develop origin/develop
+          git branch -f main origin/main
+          git flow config sync
+          if [[ "$(git config --get gitflow.branch.develop.parent)" != main || "$(git config --get gitflow.branch.develop.downstreamstrategy)" != merge ]]; then
+            echo '::error::Expected develop to update from main using a merge.'
+            exit 1
+          fi
+          git flow update
+          gh auth setup-git
+          git push origin HEAD:refs/heads/develop
