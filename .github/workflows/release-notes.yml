@@ -1,0 +1,50 @@
+name: Sync release notes
+
+on:
+  workflow_dispatch:
+    inputs:
+      pull_request:
+        description: Open Release Please preparation PR number
+        required: true
+        type: number
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-notes-${{ inputs.pull_request }}
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Synchronize personally drafted notes
+    if: >-
+      github.repository == 'imsergiobernal/vaia' &&
+      github.ref == 'refs/heads/main' &&
+      github.actor_id == '20087388' &&
+      github.actor == 'imsergiobernal' &&
+      github.triggering_actor == 'imsergiobernal'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Check out trusted tools and complete history
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22'
+          package-manager-cache: false
+
+      - name: Synchronize the changelog entry into its preparation PR
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PREPARATION_PR: ${{ inputs.pull_request }}
+        run: node scripts/sync-release-notes.mjs "$PREPARATION_PR"
