@@ -28,33 +28,6 @@ The release PR is merged into `main` in GitHub. Finalization below tags the
 actual PR merge commit and merges `main` into `develop`; do not run `git flow
 release finish` after merging the PR, since that would perform another merge.
 
-## Configure the preparation bot
-
-Release Please `17.11.2` is pinned in the workspace lockfile. On each pushed
-`release/*` or `hotfix/*` branch, the preparation workflow generates the target
-component's initial changelog entry on that branch and opens one PR from the
-same branch to `main`. It never creates a separate preparation branch, tag,
-GitHub Release or package publication. The remote `main` branch must exist and
-be accessible to the App before preparation starts.
-
-Create a GitHub App under your account's **Settings > Developer settings > GitHub
-Apps**, or use an existing App dedicated to this repository:
-
-1. Set its homepage to this repository, disable webhooks (the workflow invokes
-   the App directly), and grant these repository permissions: **Contents: read
-   and write**, **Pull requests: read and write**, and **Issues: read and write**.
-2. Install the App using **Only select repositories**, selecting only `vaia`.
-3. In the repository's **Settings > Secrets and variables > Actions**, set the
-   variable `RELEASE_PLEASE_APP_ID` to the App ID, and the secret
-   `RELEASE_PLEASE_APP_PRIVATE_KEY` to a generated PEM private key. Keep the key
-   out of Git, logs and issue/PR bodies.
-
-The workflow generates a short-lived installation token limited to this
-repository and these permissions. The token is revoked when the job ends.
-Missing configuration or rejected authentication fails with a configuration
-message; there is no fallback to `GITHUB_TOKEN`. Using the App allows the existing
-PR CI to run automatically on the release PR.
-
 ## Configure npm publication
 
 Both packages publish publicly to `https://registry.npmjs.org` under the
@@ -101,10 +74,9 @@ of opening the branch. For example, for CLI `0.2.0`:
 ```sh
 git flow release start cli-v0.2.0
 pnpm --dir apps/cli version 0.2.0 --no-git-tag-version
-node scripts/validate-release.mjs branch release/cli-v0.2.0
+node --experimental-strip-types scripts/validate-release.mts branch release/cli-v0.2.0
 git add apps/cli/package.json
 git commit -m "chore(cli): prepare 0.2.0"
-git flow release publish cli-v0.2.0
 ```
 
 For the SDK use `sdk-v<version>` and `pnpm --dir packages/sdk version <version>
@@ -114,28 +86,33 @@ resulting lockfile change together with the manifest. If the version is already
 correct (for example, the first `0.1.0` release), skip the version command and
 commit.
 
-Each push runs the **Prepare release branch** workflow. Release Please uses the
-branch's component and target version to generate the first changelog entry from
-component history. The workflow commits that entry to the release branch and
-opens a single PR to `main`; later pushes update that same PR. The App needs
-permission to push to the release branch; branch protection must permit the App.
-
-An existing entry for the target version is retained, so repeated runs never
-silently overwrite manually drafted notes. After source changes, update and review
-the entry again before merging. If no releasable commits exist, preparation fails
-rather than opening a PR without notes. For a CLI release containing only SDK
-changes, use a `deps(cli)` commit touching the CLI manifest.
-
-For local preparation set `GITHUB_REPOSITORY=imsergiobernal/vaia` and
-`RELEASE_PLEASE_TOKEN` to an installation token from the same App, then run:
+Prepare the changelog on the checked-out release branch, using committed local
+history and locally available tags:
 
 ```sh
 pnpm release:prepare release/cli-v0.2.0
 ```
 
-This writes the changelog in the checkout only if the entry does not already
-exist. It does not create a branch, commit, PR, tag or publication. Never put
-credentials on the command line or commit them in a configuration file.
+Fetch the complete history and all tags before disconnecting; a shallow checkout is
+not supported. The command selects commits affecting the component since its
+nearest reachable stable tag (or the entire history for a first release). SDK
+notes also include OpenAPI changes. Conventional Commit types `feat`, `fix`,
+`perf`, `deps`, `docs`, `refactor`, and `revert` are included; breaking commits
+are included regardless of type. It reads committed changes only. It retains an
+existing entry and reports when there are no releasable changes. Review and edit
+the draft before committing it; no branch, PR, tag or publication is created.
+
+After reviewing the draft, commit the changelog and push the branch:
+
+```sh
+git add apps/cli/CHANGELOG.md
+git commit -m "docs(release): prepare cli 0.2.0 notes"
+git flow release publish cli-v0.2.0
+```
+
+Open its PR to `main` manually. After source changes, review and update the
+changelog again. For a CLI release containing only SDK changes,
+use a `deps(cli)` commit touching the CLI manifest.
 
 Use the branch for corrections, documentation and package preparation. Continue
 new features on `develop`. Do not bump the other component just to match versions.
@@ -148,8 +125,8 @@ command. Packing converts its workspace SDK dependency into the exact current
 tag and approve it in npm before pushing the CLI tag; an already published SDK
 version can be reused.
 The CLI publisher checks that dependency in npm before publishing,
-and fails with a message if it is unavailable. CI tests the CLI tarball with a
-local packed SDK so development does not require publishing either package.
+and fails with a message if it is unavailable. The CLI release workflow tests the
+CLI tarball with a local packed SDK before staging it.
 
 ## Draft final release notes
 
@@ -161,8 +138,8 @@ changelog and updates only the PR body; it does not start Codex, merge or publis
 Keep the Codex environment private; repository prompts and markers do not
 independently authenticate an agent or reviewer.
 
-1. Wait for **Prepare release branch** and open the PR from the release branch
-   to `main`. Stabilize source and dependency changes on that same branch.
+1. Prepare and push the release branch locally and open its PR to `main`.
+   Stabilize source and dependency changes on that same branch.
 2. Ask Codex to follow [the release notes prompt](../.github/codex/prompts/release-notes.md)
    for the release PR. It compares the candidate with the nearest reachable stable
    tag of the same component, or the empty tree for a first release. Review the
@@ -181,13 +158,12 @@ independently authenticate an agent or reviewer.
    candidate to be an ancestor of the release head and permits only the component
    changelog to differ from that candidate. It preserves existing PR text and
    replaces only its own notes block. Redraft after later source changes.
-5. Review the changelog and PR, wait for CI, and run the same checks locally:
+5. Review the changelog and PR, and run the checks locally:
 
    ```sh
    pnpm install --frozen-lockfile
-   pnpm test
    pnpm --filter '@imsergiobernal/vaia-cli...' --fail-if-no-match -r run build
-   pnpm --filter '@imsergiobernal/vaia-cli...' --fail-if-no-match -r run typecheck
+   pnpm typecheck
    ```
 
 ## Finish and publish
@@ -235,21 +211,15 @@ entry to `release-notes.md`, which travels with the verified assets and becomes
 the GitHub Release body. Missing, duplicate or empty entries fail before building
 or publishing; notes from another component or version are never substituted.
 
-Branch pushes validate and prepare PRs; tags stage packages for approval. CI checks release/hotfix
-names and manifest versions on both PR head and target branches. A tag must match its own
-component's manifest, and its exact commit must already be an ancestor of
-`origin/main`. Full history is fetched for that check. Older integrated tags can
-still be validated when `main` has advanced.
+Branch preparation and PR creation are manual. Tags stage packages for approval.
+A tag must match its component's manifest, and its exact commit must already be
+an ancestor of `origin/main`. Full history is fetched for that check. Older
+integrated tags can still be validated when `main` has advanced.
 
-For the first release, push the setup changes, configure the App, and ensure the
-preparation workflow, validator and locked dependency exist on the stabilization
-branch. Manual publication dispatch requires its workflow to exist on `main` and
-accepts only an existing tag with the same validation as tag-triggered runs.
-
-Validate the setup with the first real release: confirm exactly one PR from
-its release branch to `main`, verify the workflow and CI, review the notes, and
-only then merge and push the tag. Avoid disposable test tags: a matching tag
-integrated into `main` is a real staging trigger.
+Manual publication dispatch requires its workflow to exist on `main` and accepts
+only an existing tag with the same validation as tag-triggered runs. Review the
+notes before merging and pushing the tag. Avoid disposable test tags: a matching
+tag integrated into `main` is a real staging trigger.
 
 ### Approve and publish the release
 
