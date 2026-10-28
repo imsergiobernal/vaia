@@ -34,7 +34,8 @@ Release Please `17.11.2` is pinned in the workspace lockfile. On each pushed
 `release/*` or `hotfix/*` branch, the preparation workflow generates the target
 component's initial changelog entry on that branch and opens one PR from the
 same branch to `main`. It never creates a separate preparation branch, tag,
-GitHub Release or package publication.
+GitHub Release or package publication. The remote `main` branch must exist and
+be accessible to the App before preparation starts.
 
 Create a GitHub App under your account's **Settings > Developer settings > GitHub
 Apps**, or use an existing App dedicated to this repository:
