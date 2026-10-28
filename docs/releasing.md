@@ -89,8 +89,10 @@ only incorporates SDK dependency changes, describe that change in a `deps(cli)`
 commit touching the CLI manifest; a version-only `chore` does not produce notes.
 
 Keep the preparation PR open during stabilization. Corrections pushed to the
-target branch update that same PR. Review its changelog and wait for its CI;
-merge it manually as the last stabilization step. A push caused by that merge
+target branch update that same PR. After the final preparation run, use
+[Draft final release notes](#draft-final-release-notes) to consolidate the notes,
+review its changelog and wait for CI. Merge it manually as the last stabilization
+step. A push caused by that merge
 does not create another preparation PR: the merged PR stays pending until the
 Gitflow finish. Finish promptly without introducing further changes after the
 preparation PR has been merged.
@@ -118,6 +120,85 @@ tag before pushing the CLI tag; an already published SDK version can be reused.
 The CLI publisher checks that dependency in GitHub Packages before publishing,
 and fails with a message if it is unavailable. CI tests the CLI tarball with a
 local packed SDK so development does not require publishing either package.
+
+## Draft final release notes
+
+Release notes are consolidated in a personal Codex session using the connected
+Vaia repository. GitHub Actions only synchronizes the committed result into the
+preparation PR; it never starts Codex or receives a Codex session or API key.
+
+The sole maintainer for this flow is **imsergiobernal**, pinned to GitHub user ID
+**20087388**. The **Sync release notes** workflow accepts manual runs from
+`main` only in `imsergiobernal/vaia`, and checks both the original actor and the
+person requesting a rerun. The script repeats these checks before accessing the
+GitHub API. Its temporary GitHub token can read repository content and update PR
+metadata; this job does not change repository files, merge, tag or publish.
+
+### Personal Codex access
+
+Connect the repository through ChatGPT Codex Connector in your personal Codex
+account and keep its environment private. Start drafting from your signed-in
+Codex session rather than a public PR comment. No public comment command, bot
+mention, issue event, or automatic PR event starts Codex in this flow.
+
+Repository workflow checks cannot control mentions sent directly to the external
+Codex GitHub integration. They are not a global owner allowlist for that app.
+For this personal-only setup, leave shared environments and repository-wide
+Codex review automation outside this flow; inspect those settings separately if
+already enabled. Repository prompts and provenance comments guide drafting and
+check freshness; they do not authenticate a Codex user. See
+[Codex authentication](https://learn.chatgpt.com/docs/auth) and the
+[GitHub integration documentation](https://learn.chatgpt.com/docs/third-party/github).
+
+### Draft, review and synchronize
+
+1. Wait for the final **Prepare release PR** run to complete and leave its
+   preparation PR open. Source and dependency changes belong on the stabilization
+   branch; the preparation PR must contain only its manifest and changelog work.
+2. From your personal Codex session, provide the existing preparation PR and ask
+   Codex to follow [.github/codex/prompts/release-notes.md](../.github/codex/prompts/release-notes.md).
+   For example:
+
+   ```text
+   Consolidate release notes for preparation PR #<number> in imsergiobernal/vaia.
+   Follow .github/codex/prompts/release-notes.md. Update only the target version's
+   changelog entry on the existing preparation branch and report evidence and
+   uncertainties for my review.
+   ```
+
+3. Review the changed changelog entry and the evidence in the personal task.
+   Codex compares the final stabilization candidate with the nearest reachable
+   stable tag of the selected component, or the empty tree for a first release.
+   Intermediate iterations, abandoned changes and internal housekeeping should
+   be consolidated or omitted. Verify omissions and incompatible changes.
+4. Ensure the notes commit is on the existing preparation branch. If your Codex
+   session provides a patch instead of pushing it, apply that patch to the same
+   branch. Preserve the original version heading, date, comparison link and all
+   older version entries.
+5. In **Actions > Sync release notes > Run workflow**, select `main` and provide
+   the preparation PR number. The workflow must already exist on `main` before
+   GitHub offers its manual trigger. Other actors are rejected before checkout.
+6. Check that the PR body matches the changelog, wait for CI on the notes commit,
+   then merge the preparation PR and continue with Gitflow finish below.
+
+The target changelog entry must include exactly one freshness marker. The agent
+instructions describe its format; use actual values, including JSON `null` for
+`previous_tag` on a first release:
+
+```html
+<!-- vaia-release-notes {"component":"cli","version":"0.2.0","candidate":"<40-character-stabilization-sha>","previous_tag":"cli-v0.1.0"} -->
+```
+
+Synchronization validates the marker against the live candidate, component,
+version and previous tag, copies exactly that version entry into the body, and
+preserves Release Please's header/footer. It refuses stale drafts, unexpected
+preparation changes or a PR changed during synchronization. Rerunning an unchanged
+synchronization does not make another edit.
+
+New stabilization pushes, or rerunning **Prepare release PR**, regenerate the
+automatic notes. Draft and review them again before synchronizing. The body
+records the notes commit and candidate SHA; publication continues to extract the
+same version entry from the committed changelog.
 
 Before finishing, merge the preparation PR, update your local release branch
 from its remote, wait for CI to pass and run the same checks locally:
