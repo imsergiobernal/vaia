@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { test } from 'node:test';
@@ -11,12 +10,10 @@ import {
 } from './sync-release-notes.mjs';
 import { extractReleaseNotes } from './release-notes.mjs';
 
-const require = createRequire(import.meta.url);
-const { PullRequestBody } = require('release-please/build/src/util/pull-request-body.js');
 const repository = 'imsergiobernal/vaia';
 const ownerEnv = {
   GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_REPOSITORY: repository,
-  GITHUB_REF: 'refs/heads/main', GITHUB_ACTOR: 'imsergiobernal',
+  GITHUB_REF: 'refs/heads/develop', GITHUB_ACTOR: 'imsergiobernal',
   GITHUB_ACTOR_ID: '20087388', GITHUB_TRIGGERING_ACTOR: 'imsergiobernal',
 };
 
@@ -65,8 +62,8 @@ function fixture(t, { component = 'cli', firstRelease = false, provenance = true
   const body = `:robot: I have created a release *beep* *boop*\n---\n\n${generatedEntry}\n---\nThis PR was generated with [Release Please](https://github.com/googleapis/release-please).`;
   const pr = {
     number: 42, state: 'open', merged: false, labels: [{ name: 'autorelease: pending' }], body,
-    base: { ref: `release/${component}-v${version}`, sha: baseSha, repo: { full_name: repository } },
-    head: { ref: `release-please--branches--release/${component}-v${version}--components--${component}`, sha: headSha, repo: { full_name: repository } },
+    base: { ref: 'main', sha: previousSha, repo: { full_name: repository } },
+    head: { ref: `release/${component}-v${version}`, sha: headSha, repo: { full_name: repository } },
   };
   return { cwd, git, write, commit, pr, previousSha, baseSha, headSha, entry, olderEntry, marker, changelog };
 }
@@ -105,7 +102,7 @@ test('authorizes only the pinned maintainer identity and checks the rerun actor'
     { GITHUB_TRIGGERING_ACTOR: undefined },
     { GITHUB_ACTOR: 'another-user', GITHUB_ACTOR_ID: '123', GITHUB_TRIGGERING_ACTOR: 'imsergiobernal' },
     { GITHUB_REPOSITORY: 'someone/vaia' },
-    { GITHUB_REF: 'refs/heads/develop' },
+    { GITHUB_REF: 'refs/heads/main' },
     { GITHUB_EVENT_NAME: 'issue_comment' },
     { GITHUB_EVENT_NAME: 'pull_request' },
   ];
@@ -123,7 +120,8 @@ test('uses its own previous stable component tag, ignoring prereleases and other
   const f = fixture(t);
   const context = releaseNotesContext(f.pr, f);
   assert.equal(context.previousTag, 'cli-v0.1.0');
-  assert.equal(context.baseSha, f.baseSha);
+  assert.equal(context.baseSha, f.previousSha);
+  assert.equal(context.candidateSha, f.baseSha);
   assert.equal(context.headSha, f.headSha);
   assert.equal(context.changelog, 'apps/cli/CHANGELOG.md');
   assert.doesNotThrow(() => validateDraftProvenance(f.entry, context));
@@ -131,7 +129,7 @@ test('uses its own previous stable component tag, ignoring prereleases and other
 
 test('supports first releases and SDK hotfixes independently', (t) => {
   const f = fixture(t, { component: 'sdk', firstRelease: true });
-  f.pr.base.ref = 'hotfix/sdk-v0.3.0';
+  f.pr.head.ref = 'hotfix/sdk-v0.3.0';
   const context = releaseNotesContext(f.pr, f);
   assert.equal(context.previousTag, null);
   assert.equal(context.changelog, 'packages/sdk/CHANGELOG.md');
@@ -144,10 +142,9 @@ test('rejects forks, closed PRs, ordinary PRs and unsupported release branches',
     (pr) => { pr.head.repo.full_name = 'someone/vaia'; },
     (pr) => { pr.base.repo.full_name = 'someone/vaia'; },
     (pr) => { pr.state = 'closed'; pr.merged = true; },
-    (pr) => { pr.labels = []; },
     (pr) => { pr.head.ref = 'feature/something'; },
     (pr) => { pr.base.ref = 'develop'; },
-    (pr) => { pr.base.ref = 'release/cli-v0.3.0'; pr.body = pr.body.replaceAll('0.2.0', '0.3.0'); },
+    (pr) => { pr.head.ref = 'release/cli-v0.3.0'; },
   ]) {
     const pr = structuredClone(f.pr);
     mutate(pr);
@@ -155,18 +152,18 @@ test('rejects forks, closed PRs, ordinary PRs and unsupported release branches',
   }
 });
 
-test('refuses source changes hidden in the notes preparation branch', (t) => {
+test('refuses source changes after the notes candidate', (t) => {
   const f = fixture(t);
   f.write('apps/cli/src/command.ts', 'export const behaviour = "hidden change";\n');
   f.pr.head.sha = f.commit('fix(cli): change source in preparation');
-  assert.throws(() => releaseNotesContext(f.pr, f), /Move source changes/);
+  assert.throws(() => releaseNotesContext(f.pr, f), /candidate changed/);
 });
 
-test('refuses version and dependency changes hidden in the preparation manifest', (t) => {
+test('refuses version and dependency changes after the notes candidate', (t) => {
   const f = fixture(t);
   f.write('apps/cli/package.json', JSON.stringify({ version: '0.2.0', dependencies: { unexpected: '1.0.0' } }));
   f.pr.head.sha = f.commit('deps(cli): change dependencies in preparation');
-  assert.throws(() => releaseNotesContext(f.pr, f), /manifests must match/);
+  assert.throws(() => releaseNotesContext(f.pr, f), /candidate changed/);
 });
 
 test('rejects missing, duplicate, malformed, stale and cross-component provenance', (t) => {
@@ -187,25 +184,23 @@ test('rejects missing, duplicate, malformed, stale and cross-component provenanc
   for (const entry of entries) assert.throws(() => validateDraftProvenance(entry, context));
 });
 
-test('copies exactly the committed release entry into a parseable PR body without writing repository files', async (t) => {
+test('copies exactly the committed release entry into the PR body without writing repository files', async (t) => {
   const f = fixture(t);
   const before = f.git('rev-parse', 'HEAD');
   const api = transport(f.pr);
   const result = await syncReleaseNotes(42, { ...f, env: ownerEnv, request: api.request });
   assert.equal(result.entry, f.entry);
   assert.equal(result.changed, true);
-  const parsed = PullRequestBody.parse(api.current.body);
-  assert.equal(parsed.releaseData[0].version.toString(), '0.2.0');
-  assert.equal(parsed.releaseData[0].notes, f.entry.trim());
+  assert.ok(api.current.body.includes(f.entry.trim()));
   assert.match(api.current.body, /synchronized by imsergiobernal/);
-  assert.doesNotMatch(api.current.body, /obsolete/);
+  assert.match(api.current.body, /obsolete/); // Existing PR text is preserved.
   assert.equal(f.git('rev-parse', 'HEAD'), before);
   assert.equal(extractReleaseNotes(f.git('show', `${before}:${f.changelog}`), '0.1.0'), f.olderEntry);
   assert.equal(api.calls.filter((call) => call.method !== 'GET').length, 1);
   assert(api.calls.every((call) => call.path === 'pulls/42'));
 });
 
-test('is idempotent and preserves the Release Please header and footer', async (t) => {
+test('is idempotent and preserves existing PR content', async (t) => {
   const f = fixture(t);
   const api = transport(f.pr);
   await syncReleaseNotes(42, { ...f, env: ownerEnv, request: api.request });

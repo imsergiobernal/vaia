@@ -7,7 +7,7 @@ export function extractReleaseNotes(changelog, version) {
   const headings = [...changelog.matchAll(/^##[\t ]+(?:\[([^\]\r\n]+)\]|([^\s]+))[^\r\n]*(?:\r?\n|$)/gm)];
   const matches = headings.filter((heading) => (heading[1] ?? heading[2]) === version);
   if (matches.length !== 1) {
-    throw new Error(`Expected exactly one CHANGELOG.md entry for ${version}; found ${matches.length}. Merge the preparation PR before finishing with Gitflow.`);
+    throw new Error(`Expected exactly one CHANGELOG.md entry for ${version}; found ${matches.length}. Prepare the release notes before merging the release PR.`);
   }
   const heading = matches[0];
   const nextHeading = headings[headings.indexOf(heading) + 1];
@@ -24,7 +24,7 @@ export function readReleaseNotes(release, { cwd = process.cwd() } = {}) {
     changelog = readFileSync(path, 'utf8');
   } catch (error) {
     if (error.code === 'ENOENT') {
-      throw new Error(`Missing ${dirname(release.manifest)}/CHANGELOG.md. Merge the preparation PR before publishing ${release.tag}.`);
+      throw new Error(`Missing ${dirname(release.manifest)}/CHANGELOG.md. Prepare the release notes before publishing ${release.tag}.`);
     }
     throw error;
   }

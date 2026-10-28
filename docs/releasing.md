@@ -23,17 +23,18 @@ git flow config sync
 git flow config status
 ```
 
-The configuration preserves the existing flow: releases start at `develop`,
-hotfixes start at `main`, both finish into `main`, and `develop` is updated from
-`main`. Both topic types create tags, with an empty additional tag prefix.
-For example, finishing `release/cli-v0.2.0` creates `cli-v0.2.0`.
+The shared configuration starts releases at `develop` and hotfixes at `main`.
+The release PR is merged into `main` in GitHub. Finalization below tags the
+actual PR merge commit and merges `main` into `develop`; do not run `git flow
+release finish` after merging the PR, since that would perform another merge.
 
 ## Configure the preparation bot
 
-Release Please `17.11.2` is pinned in the workspace lockfile. It creates and
-updates a preparation PR against each pushed `release/*` or `hotfix/*` branch.
-It does not create tags, GitHub Releases or package publications. Gitflow and the
-tag-triggered publishers retain those responsibilities.
+Release Please `17.11.2` is pinned in the workspace lockfile. On each pushed
+`release/*` or `hotfix/*` branch, the preparation workflow generates the target
+component's initial changelog entry on that branch and opens one PR from the
+same branch to `main`. It never creates a separate preparation branch, tag,
+GitHub Release or package publication.
 
 Create a GitHub App under your account's **Settings > Developer settings > GitHub
 Apps**, or use an existing App dedicated to this repository:
@@ -51,7 +52,7 @@ The workflow generates a short-lived installation token limited to this
 repository and these permissions. The token is revoked when the job ends.
 Missing configuration or rejected authentication fails with a configuration
 message; there is no fallback to `GITHUB_TOKEN`. Using the App allows the existing
-PR CI to run automatically on its preparation PRs.
+PR CI to run automatically on the release PR.
 
 ## Configure npm publication
 
@@ -112,39 +113,28 @@ resulting lockfile change together with the manifest. If the version is already
 correct (for example, the first `0.1.0` release), skip the version command and
 commit.
 
-Each push runs the **Prepare release PR** workflow, serializing runs for that
-branch. The branch's component selects exactly one package; its version is
-passed to Release Please as `releaseAs`, so conventional commits cannot silently
-change the chosen target version. The PR updates the package's `CHANGELOG.md`
-and maintains its target manifest version. The other component is not bumped.
+Each push runs the **Prepare release branch** workflow. Release Please uses the
+branch's component and target version to generate the first changelog entry from
+component history. The workflow commits that entry to the release branch and
+opens a single PR to `main`; later pushes update that same PR. The App needs
+permission to push to the release branch; branch protection must permit the App.
 
-Write Conventional Commits (`feat`, `fix`, `deps`, and breaking-change markers)
-so the generated changelog describes the release. Release Please considers the
-history after the latest reachable tag of the same component, or all available
-component history for the first release. If there are no user-facing changes,
-it reports that there is no preparation PR to create. For a CLI release that
-only incorporates SDK dependency changes, describe that change in a `deps(cli)`
-commit touching the CLI manifest; a version-only `chore` does not produce notes.
+An existing entry for the target version is retained, so repeated runs never
+silently overwrite manually drafted notes. After source changes, update and review
+the entry again before merging. If no releasable commits exist, preparation fails
+rather than opening a PR without notes. For a CLI release containing only SDK
+changes, use a `deps(cli)` commit touching the CLI manifest.
 
-Keep the preparation PR open during stabilization. Corrections pushed to the
-target branch update that same PR. After the final preparation run, use
-[Draft final release notes](#draft-final-release-notes) to consolidate the notes,
-review its changelog and wait for CI. Merge it manually as the last stabilization
-step. A push caused by that merge
-does not create another preparation PR: the merged PR stays pending until the
-Gitflow finish. Finish promptly without introducing further changes after the
-preparation PR has been merged.
-
-To rerun preparation locally, provide `GITHUB_REPOSITORY=imsergiobernal/vaia` and
-`RELEASE_PLEASE_TOKEN` as an installation token from the same App, then run:
+For local preparation set `GITHUB_REPOSITORY=imsergiobernal/vaia` and
+`RELEASE_PLEASE_TOKEN` to an installation token from the same App, then run:
 
 ```sh
 pnpm release:prepare release/cli-v0.2.0
 ```
 
-This command only creates or updates a preparation PR; it never finishes the
-branch or publishes anything. Do not put the token in the command line or commit
-it in a configuration file.
+This writes the changelog in the checkout only if the entry does not already
+exist. It does not create a branch, commit, PR, tag or publication. Never put
+credentials on the command line or commit them in a configuration file.
 
 Use the branch for corrections, documentation and package preparation. Continue
 new features on `develop`. Do not bump the other component just to match versions.
@@ -162,105 +152,65 @@ local packed SDK so development does not require publishing either package.
 
 ## Draft final release notes
 
-Release notes are consolidated in a personal Codex session using the connected
-Vaia repository. GitHub Actions only synchronizes the committed result into the
-preparation PR; it never starts Codex or receives a Codex session or API key.
+The maintainer `imsergiobernal` (GitHub user ID `20087388`) drafts notes in a
+personal Codex session. The **Sync release notes** workflow runs manually from
+`develop` in `imsergiobernal/vaia` and checks the original actor and rerun actor.
+It uses trusted scripts from `develop`, reads the release branch's committed
+changelog and updates only the PR body; it does not start Codex, merge or publish.
+Keep the Codex environment private; repository prompts and markers do not
+independently authenticate an agent or reviewer.
 
-The sole maintainer for this flow is **imsergiobernal**, pinned to GitHub user ID
-**20087388**. The **Sync release notes** workflow accepts manual runs from
-`main` only in `imsergiobernal/vaia`, and checks both the original actor and the
-person requesting a rerun. The script repeats these checks before accessing the
-GitHub API. Its temporary GitHub token can read repository content and update PR
-metadata; this job does not change repository files, merge, tag or publish.
+1. Wait for **Prepare release branch** and open the PR from the release branch
+   to `main`. Stabilize source and dependency changes on that same branch.
+2. Ask Codex to follow [the release notes prompt](../.github/codex/prompts/release-notes.md)
+   for the release PR. It compares the candidate with the nearest reachable stable
+   tag of the same component, or the empty tree for a first release. Review the
+   resulting notes and source evidence.
+3. Commit and push the notes to the same release branch. The entry must contain
+   exactly one freshness marker, using the candidate SHA captured before the
+   notes commit and `null` for the first release:
 
-### Personal Codex access
-
-Connect the repository through ChatGPT Codex Connector in your personal Codex
-account and keep its environment private. Start drafting from your signed-in
-Codex session rather than a public PR comment. No public comment command, bot
-mention, issue event, or automatic PR event starts Codex in this flow.
-
-Repository workflow checks cannot control mentions sent directly to the external
-Codex GitHub integration. They are not a global owner allowlist for that app.
-For this personal-only setup, leave shared environments and repository-wide
-Codex review automation outside this flow; inspect those settings separately if
-already enabled. Repository prompts and provenance comments guide drafting and
-check freshness; they do not authenticate a Codex user. See
-[Codex authentication](https://learn.chatgpt.com/docs/auth) and the
-[GitHub integration documentation](https://learn.chatgpt.com/docs/third-party/github).
-
-### Draft, review and synchronize
-
-1. Wait for the final **Prepare release PR** run to complete and leave its
-   preparation PR open. Source and dependency changes belong on the stabilization
-   branch; the preparation PR must contain only its manifest and changelog work.
-2. From your personal Codex session, provide the existing preparation PR and ask
-   Codex to follow [.github/codex/prompts/release-notes.md](../.github/codex/prompts/release-notes.md).
-   For example:
-
-   ```text
-   Consolidate release notes for preparation PR #<number> in imsergiobernal/vaia.
-   Follow .github/codex/prompts/release-notes.md. Update only the target version's
-   changelog entry on the existing preparation branch and report evidence and
-   uncertainties for my review.
+   ```html
+   <!-- vaia-release-notes {"component":"cli","version":"0.2.0","candidate":"<40-character-candidate-sha>","previous_tag":"cli-v0.1.0"} -->
    ```
 
-3. Review the changed changelog entry and the evidence in the personal task.
-   Codex compares the final stabilization candidate with the nearest reachable
-   stable tag of the selected component, or the empty tree for a first release.
-   Intermediate iterations, abandoned changes and internal housekeeping should
-   be consolidated or omitted. Verify omissions and incompatible changes.
-4. Ensure the notes commit is on the existing preparation branch. If your Codex
-   session provides a patch instead of pushing it, apply that patch to the same
-   branch. Preserve the original version heading, date, comparison link and all
-   older version entries.
-5. In **Actions > Sync release notes > Run workflow**, select `main` and provide
-   the preparation PR number. The workflow must already exist on `main` before
-   GitHub offers its manual trigger. Other actors are rejected before checkout.
-6. Check that the PR body matches the changelog, wait for CI on the notes commit,
-   then merge the preparation PR and continue with Gitflow finish below.
+4. In **Actions > Sync release notes > Run workflow**, select `develop` and
+   provide the release PR number. The workflow must already exist on the default
+   branch before GitHub offers its manual trigger. The synchronizer requires the
+   candidate to be an ancestor of the release head and permits only the component
+   changelog to differ from that candidate. It preserves existing PR text and
+   replaces only its own notes block. Redraft after later source changes.
+5. Review the changelog and PR, wait for CI, and run the same checks locally:
 
-The target changelog entry must include exactly one freshness marker. The agent
-instructions describe its format; use actual values, including JSON `null` for
-`previous_tag` on a first release:
-
-```html
-<!-- vaia-release-notes {"component":"cli","version":"0.2.0","candidate":"<40-character-stabilization-sha>","previous_tag":"cli-v0.1.0"} -->
-```
-
-Synchronization validates the marker against the live candidate, component,
-version and previous tag, copies exactly that version entry into the body, and
-preserves Release Please's header/footer. It refuses stale drafts, unexpected
-preparation changes or a PR changed during synchronization. Rerunning an unchanged
-synchronization does not make another edit.
-
-New stabilization pushes, or rerunning **Prepare release PR**, regenerate the
-automatic notes. Draft and review them again before synchronizing. The body
-records the notes commit and candidate SHA; publication continues to extract the
-same version entry from the committed changelog.
-
-Before finishing, merge the preparation PR, update your local release branch
-from its remote, wait for CI to pass and run the same checks locally:
-
-```sh
-pnpm install --frozen-lockfile
-pnpm test
-pnpm --filter '@imsergiobernal/vaia-cli...' --fail-if-no-match -r run build
-pnpm --filter '@imsergiobernal/vaia-cli...' --fail-if-no-match -r run typecheck
-```
+   ```sh
+   pnpm install --frozen-lockfile
+   pnpm test
+   pnpm --filter '@imsergiobernal/vaia-cli...' --fail-if-no-match -r run build
+   pnpm --filter '@imsergiobernal/vaia-cli...' --fail-if-no-match -r run typecheck
+   ```
 
 ## Finish and publish
 
-Pull the merged preparation into the local release branch, finish with Gitflow,
-then push `main` and `develop` before the individual tag:
+Merge the reviewed release PR into `main` using a merge commit. Record the
+exact merge commit SHA shown by GitHub as `<PR_MERGE_COMMIT_SHA>`; use that SHA
+rather than whichever commit `main` happens to point at later. Update `develop`
+from `main`, then create and push the component tag on the merge commit:
 
 ```sh
-git checkout release/cli-v0.2.0
-git pull --ff-only origin release/cli-v0.2.0
-git flow release finish cli-v0.2.0
-git push origin main develop
+git fetch origin --tags
+git merge-base --is-ancestor <PR_MERGE_COMMIT_SHA> origin/main
+git switch develop
+git pull --ff-only origin develop
+git merge --no-ff origin/main
+git push origin develop
+git tag -a cli-v0.2.0 <PR_MERGE_COMMIT_SHA> -m "cli-v0.2.0"
 git push origin refs/tags/cli-v0.2.0
 ```
+
+Resolve and review any merge conflicts before pushing `develop`. The PR merge has
+already updated `main`; do not run `git flow release finish` afterwards. The tag
+must name the approved PR's merge commit. A merge commit preserves the release
+branch history and allows the tag validator to check its ancestry in `main`.
 
 Do not publish all tags together. The tag triggers only the matching workflow:
 
@@ -295,12 +245,10 @@ preparation workflow, validator and locked dependency exist on the stabilization
 branch. Manual publication dispatch requires its workflow to exist on `main` and
 accepts only an existing tag with the same validation as tag-triggered runs.
 
-Validate the setup in GitHub by publishing the first real stabilization branch.
-Confirm that exactly one preparation PR targets that branch, its CI runs, an
-additional fix updates the same PR, and merging the PR does not create a tag,
-GitHub Release, package version or second preparation PR. Only then finish the
-release with Gitflow and push the tag. Avoid disposable test tags: a matching
-tag integrated into `main` is a real staging trigger.
+Validate the setup with the first real release: confirm exactly one PR from
+its release branch to `main`, verify the workflow and CI, review the notes, and
+only then merge and push the tag. Avoid disposable test tags: a matching tag
+integrated into `main` is a real staging trigger.
 
 ### Approve and publish the release
 
@@ -330,8 +278,7 @@ retrying; recover the draft from the verified run artifacts as needed.
 
 ## Hotfixes
 
-Use the same procedure with `git flow hotfix start cli-v0.2.1` and
-`git flow hotfix finish cli-v0.2.1` (or `sdk-v<version>`). Update the corresponding
-manifest immediately after starting. Hotfixes begin at `main`, finish into `main`
-and propagate into `develop`. They receive the same automatic preparation PR;
-merge and pull it before finishing, then push both branches before the hotfix tag.
+Use the same single-PR process with `git flow hotfix start cli-v0.2.1` (or
+`sdk-v<version>`). Hotfixes start at `main`; update the selected manifest, push
+the branch, review its PR to `main`, then tag the exact PR merge commit and merge
+`main` into `develop`. Do not run `git flow hotfix finish` after merging the PR.

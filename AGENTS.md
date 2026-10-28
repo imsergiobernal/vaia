@@ -103,7 +103,8 @@ fix(cli/sdk): handle empty responses
 - Branch format: `release/<component>-v<MAJOR.MINOR.PATCH>` or `hotfix/<component>-v<...>` where `<component>` is `cli` or `sdk`. The branch names the final target version (stable SemVer, no prerelease suffixes).
 - Bump exactly one component's manifest per release branch: `pnpm --dir apps/cli version X.Y.Z --no-git-tag-version` (or `packages/sdk`). Never bump the other package "to match".
 - Write **Conventional Commits** (`feat`, `fix`, `deps`, breaking-change markers) — generated changelogs depend on them. A CLI release that only incorporates SDK changes should use a `deps(cli)` commit touching the CLI manifest.
-- Tags (`cli-v*`, `sdk-v*`) stage packages in npm for manual approval with 2FA and create draft GitHub Releases, after verifying the tagged commit is an ancestor of `main`. Merging the Release Please preparation PR does not publish anything. Approve in npm before publishing the GitHub Release draft.
+- Each release or hotfix has one PR from its own branch to `main`; the preparation workflow commits the initial changelog to that branch. Review and merge the PR, tag its exact merge commit and merge `main` into `develop`. Do not run `git flow finish` after the PR merge.
+- Tags (`cli-v*`, `sdk-v*`) stage packages in npm for manual approval with 2FA and create draft GitHub Releases, after verifying the tagged commit is an ancestor of `main`. Merging the release PR does not publish anything. Approve in npm before publishing the GitHub Release draft.
 - When staging the CLI, its SDK dependency version must already be approved and published to npm (push and approve the matching `sdk-vX.Y.Z` tag first).
 
 ## Pull Request Guidelines

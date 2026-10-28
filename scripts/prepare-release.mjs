@@ -1,57 +1,67 @@
+import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import releasePlease from 'release-please';
 import { validateReleaseBranch } from './validate-release.mjs';
+import { extractReleaseNotes } from './release-notes.mjs';
 
 const { GitHub, Manifest } = releasePlease;
 
 export async function prepareRelease(branch, {
-  cwd = process.cwd(),
-  env = process.env,
-  createGitHub = (options) => GitHub.create(options),
-  log = console.log,
+  cwd = process.cwd(), env = process.env,
+  createGitHub = (options) => GitHub.create(options), log = console.log,
 } = {}) {
-  // Invalid refs and mismatched local versions must fail before contacting GitHub.
   const release = validateReleaseBranch(branch, { cwd });
   const repository = /^([^/\s]+)\/([^/\s]+)$/.exec(env.GITHUB_REPOSITORY ?? '');
-  if (!repository) {
-    throw new Error('Set GITHUB_REPOSITORY to the owner/repository to prepare.');
-  }
+  if (!repository) throw new Error('Set GITHUB_REPOSITORY to the owner/repository to prepare.');
   if (!env.RELEASE_PLEASE_TOKEN?.trim()) {
     throw new Error('Set RELEASE_PLEASE_TOKEN to a GitHub App installation token. No fallback token is used.');
+  }
+
+  const changelog = release.manifest.replace(/package\.json$/, 'CHANGELOG.md');
+  const changelogPath = resolve(cwd, changelog);
+  let localContent;
+  try { localContent = readFileSync(changelogPath, 'utf8'); }
+  catch (error) { if (error.code !== 'ENOENT') throw error; }
+  if (localContent !== undefined) {
+    try {
+      extractReleaseNotes(localContent, release.version);
+      log(`Existing ${release.tag} notes retained in ${changelog}; update them manually if the candidate changes.`);
+      return { release, changelog, changed: false };
+    } catch (error) {
+      if (!error.message.includes('found 0.')) throw error;
+    }
   }
 
   const [, owner, repo] = repository;
   try {
     const github = await createGitHub({ owner, repo, token: env.RELEASE_PLEASE_TOKEN, defaultBranch: branch });
     const manifest = await Manifest.fromConfig(github, branch, {
-      releaseType: 'node',
-      component: release.component,
-      releaseAs: release.version,
-      includeComponentInTag: true,
-      includeVInTag: true,
-      tagSeparator: '-',
-      skipGithubRelease: true,
-    }, {
-      separatePullRequests: true,
-      alwaysUpdate: true,
-      commitSearchDepth: Number.MAX_SAFE_INTEGER,
-    }, dirname(release.manifest).replaceAll('\\', '/'));
-
-    // Deliberately use only the PR operation. Gitflow owns tags and the
-    // tag-triggered publishers own GitHub Releases and package publication.
-    const pullRequests = (await manifest.createPullRequests()).filter(Boolean);
-    if (pullRequests.length === 0) {
-      log(`No PR created for ${branch}: no releasable changes, or preparation is already merged. Gitflow remains responsible for finishing the release.`);
-    } else {
-      for (const pr of pullRequests) {
-        log(`Prepared ${release.tag}: https://github.com/${owner}/${repo}/pull/${pr.number} -> ${branch}`);
-      }
+      releaseType: 'node', component: release.component, releaseAs: release.version,
+      includeComponentInTag: true, includeVInTag: true, tagSeparator: '-', skipGithubRelease: true,
+    }, { separatePullRequests: true, commitSearchDepth: Number.MAX_SAFE_INTEGER },
+    dirname(release.manifest).replaceAll('\\', '/'));
+    // Generate a candidate without creating Release Please's separate branch or PR.
+    const candidates = await manifest.buildPullRequests();
+    if (candidates.length === 0) {
+      log(`No releasable changes found for ${release.tag}; no changelog was written.`);
+      return { release, changelog, changed: false };
     }
-    return { release, pullRequests };
+    if (candidates.length !== 1) throw new Error('Expected a single component release candidate.');
+    const updates = candidates[0].updates.filter((update) => update.path === changelog);
+    if (updates.length === 0) throw new Error(`Release Please did not produce ${changelog}.`);
+    const changes = await github.buildChangeSet(updates, branch);
+    const change = changes.get(changelog);
+    if (!change || (change.originalContent ?? undefined) !== localContent) {
+      throw new Error('The remote changelog differs from the checked-out branch; fetch and retry.');
+    }
+    extractReleaseNotes(change.content, release.version);
+    writeFileSync(changelogPath, change.content);
+    log(`Prepared ${release.tag} notes in ${changelog}; no branch, PR, tag or package was created.`);
+    return { release, changelog, changed: true };
   } catch (error) {
     if (error.status === 401 || error.status === 403) {
-      throw new Error('Release Please authentication failed. Check that the GitHub App is installed on this repository and has Contents, Pull requests and Issues write permissions.', { cause: error });
+      throw new Error('Release Please authentication failed. Check the GitHub App installation and permissions.', { cause: error });
     }
     throw error;
   }

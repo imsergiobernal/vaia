@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -10,8 +10,7 @@ import { validateReleaseTag } from './validate-release.mjs';
 
 releasePlease.setLogger(new Proxy({}, { get: () => () => {} }));
 
-// Exercise the installed Release Please strategies and PR lifecycle. Only the
-// GitHub transport is replaced; any attempt to publish or create a tag fails.
+// Exercise installed Release Please strategies with an in-memory GitHub transport.
 class MemoryGitHub {
   repository = { owner: 'example', repo: 'vaia', defaultBranch: 'main' };
   files = new Map([
@@ -49,6 +48,7 @@ class MemoryGitHub {
       if (originalContent === undefined && !update.createIfMissing) continue;
       changes.set(update.path, { mode: '100644', originalContent: originalContent ?? null, content: update.updater.updateContent(originalContent) });
     }
+    this.changes = changes;
     return changes;
   }
   async createPullRequest(pr, branch, _message, updates) {
@@ -94,9 +94,9 @@ function fixture(t, github = new MemoryGitHub()) {
 test('prepares only CLI at the version fixed by the branch, even for breaking commits', async (t) => {
   const { github, options } = fixture(t);
   const result = await prepareRelease('release/cli-v0.2.0', options);
-  assert.equal(result.pullRequests.length, 1);
-  assert.equal(github.prs[0].baseBranchName, 'release/cli-v0.2.0');
-  assert.equal(JSON.parse(github.changes.get('apps/cli/package.json').content).version, '0.2.0');
+  assert.equal(result.changed, true);
+  assert.equal(github.prs.length, 0);
+  assert.equal(JSON.parse(readFileSync(join(options.cwd, 'apps/cli/package.json'), 'utf8')).version, '0.2.0');
   const notes = github.changes.get('apps/cli/CHANGELOG.md').content;
   assert.match(notes, /new command interface/);
   assert.match(notes, /initial CLI feature/);
@@ -109,8 +109,8 @@ test('prepares only CLI at the version fixed by the branch, even for breaking co
 test('prepares an SDK hotfix independently, including its first-release history', async (t) => {
   const { github, options } = fixture(t);
   await prepareRelease('hotfix/sdk-v0.3.0', options);
-  assert.equal(github.prs[0].baseBranchName, 'hotfix/sdk-v0.3.0');
-  assert.equal(JSON.parse(github.changes.get('packages/sdk/package.json').content).version, '0.3.0');
+  assert.equal(github.prs.length, 0);
+  assert.equal(JSON.parse(readFileSync(join(options.cwd, 'packages/sdk/package.json'), 'utf8')).version, '0.3.0');
   const notes = github.changes.get('packages/sdk/CHANGELOG.md').content;
   assert.match(notes, /new SDK resource/);
   assert.match(notes, /initial SDK feature/);
@@ -153,29 +153,42 @@ test('starts history at the previous tag of the selected component, ignoring new
   assert.match(notes, /cli-v0\.1\.0\.\.\.cli-v0\.2\.0/);
 });
 
-test('updates the same PR after fixes and does not create another after it is merged', async (t) => {
+test('keeps existing notes on repeated runs and never creates a separate PR', async (t) => {
   const { github, options, messages } = fixture(t);
   await prepareRelease('release/cli-v0.2.0', options);
   github.commits.unshift({ sha: '5'.repeat(40), message: 'fix(cli): fix stabilization bug', files: ['apps/cli/src/fix.ts'] });
   await prepareRelease('release/cli-v0.2.0', options);
-  assert.equal(github.created, 1);
-  assert.equal(github.updated, 1);
-  assert.match(github.changes.get('apps/cli/CHANGELOG.md').content, /fix stabilization bug/);
-  github.prs[0].state = 'MERGED';
-  const result = await prepareRelease('release/cli-v0.2.0', options);
-  assert.equal(result.pullRequests.length, 0);
-  assert.equal(github.created, 1);
-  assert.equal(github.updated, 1);
-  assert.match(messages.at(-1), /No PR created/);
+  assert.equal(github.created, 0);
+  assert.equal(github.updated, 0);
+  assert.doesNotMatch(readFileSync(join(options.cwd, 'apps/cli/CHANGELOG.md'), 'utf8'), /fix stabilization bug/);
+  assert.match(messages.at(-1), /Existing.*notes retained/);
 });
 
-test('reports no PR when there are no releasable component changes', async (t) => {
+test('reports no notes when there are no releasable component changes', async (t) => {
   const { github, options, messages } = fixture(t);
   github.commits = [{ sha: '1'.repeat(40), message: 'chore(cli): prepare version', files: ['apps/cli/package.json'] }];
   const result = await prepareRelease('release/cli-v0.2.0', options);
-  assert.equal(result.pullRequests.length, 0);
+  assert.equal(result.changed, false);
   assert.equal(github.created, 0);
-  assert.match(messages[0], /no releasable changes/);
+  assert.match(messages[0], /no releasable changes/i);
+});
+
+test('does not overwrite a changelog that differs from the release branch', async (t) => {
+  const { options } = fixture(t);
+  const path = join(options.cwd, 'apps/cli/CHANGELOG.md');
+  const local = '# Changelog\n\n## 0.1.0\n\n- Existing notes.\n';
+  writeFileSync(path, local);
+  await assert.rejects(prepareRelease('release/cli-v0.2.0', options), /remote changelog differs/);
+  assert.equal(readFileSync(path, 'utf8'), local);
+});
+
+test('rejects duplicate target entries rather than overwriting authored notes', async (t) => {
+  const { options } = fixture(t);
+  const path = join(options.cwd, 'apps/cli/CHANGELOG.md');
+  const local = '# Changelog\n\n## 0.2.0\n\n- One.\n\n## 0.2.0\n\n- Two.\n';
+  writeFileSync(path, local);
+  await assert.rejects(prepareRelease('release/cli-v0.2.0', options), /found 2/);
+  assert.equal(readFileSync(path, 'utf8'), local);
 });
 
 test('considers the full available history for the first release instead of stopping at 500 commits', async (t) => {
@@ -208,7 +221,7 @@ test('explains rejected App authentication without exposing its token', async (t
   for (const status of [401, 403]) {
     options.createGitHub = async () => { throw Object.assign(new Error('rejected test-installation-token'), { status }); };
     await assert.rejects(prepareRelease('release/cli-v0.2.0', options), (error) => {
-      assert.match(error.message, /App is installed.*write permissions/);
+      assert.match(error.message, /App installation and permissions/);
       assert.doesNotMatch(error.message, /test-installation-token/);
       return true;
     });

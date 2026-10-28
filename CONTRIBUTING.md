@@ -84,7 +84,7 @@ flowchart LR
 | [packages/sdk](packages/sdk/) | Typed ESM HTTP client built on `openapi-fetch`, resource methods and generated OpenAPI schema types. |
 | [packages/openapi](packages/openapi/) | OpenAPI 3.0 contract in `openapi.yaml`; workspace-only and never published. |
 | [scripts](scripts/) | Release preparation, notes validation/synchronization, publication validation and notes extraction, with Node.js tests. |
-| [.github/workflows](.github/workflows/) | CI, Release Please preparation, owner-only notes synchronization and tag-triggered CLI/SDK publication. |
+| [.github/workflows](.github/workflows/) | CI, single-branch release preparation, owner-only notes synchronization and tag-triggered CLI/SDK publication. |
 | [.github/actions](.github/actions/) | Verification of packed CLI and SDK packages outside the workspace. |
 | [docs/releasing.md](docs/releasing.md) | Release and hotfix procedure, Git Flow Next setup and preparation bot configuration. |
 
@@ -99,7 +99,7 @@ flowchart LR
 | `pnpm commitlint --edit <commit-message-file>` | Validate a commit message against the repository's Conventional Commits rules. |
 | `pnpm generate` | Regenerate SDK schema types from the OpenAPI contract. |
 | `pnpm test` | Run `node --test` over `scripts/*.test.mjs`. |
-| `pnpm release:prepare <branch>` | Create/update the Release Please preparation PR; see the [release guide](docs/releasing.md) for branches and required credentials. |
+| `pnpm release:prepare <branch>` | Generate the initial changelog entry in the current checkout; see the [release guide](docs/releasing.md) for branches and required credentials. |
 
 ## Regenerating SDK types
 
@@ -196,7 +196,8 @@ merging.
 
 CLI and SDK have independent versions. Follow [docs/releasing.md](docs/releasing.md)
 for branch naming, component version preparation, Git Flow Next, Release Please
-and publication. After stabilization, draft notes in your personal Codex session
+and publication. Each release PR goes directly from its release branch to `main`.
+After stabilization, draft notes in your personal Codex session
 and follow the [release notes procedure](docs/releasing.md#draft-final-release-notes).
 Only `imsergiobernal` may run the workflow that synchronizes the committed notes
-into the preparation PR. Keep the procedures in the release guide.
+into the release PR. Keep the procedures in the release guide.
