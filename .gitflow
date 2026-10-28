@@ -61,3 +61,12 @@
 	prefix = support/
 	autoupdate = false
 	tag = false
+[gitflow "branch.devops"]
+    type = topic
+    parent = main
+    startpoint = main
+    upstreamstrategy = merge
+    downstreamstrategy = rebase
+    prefix = devops/
+    autoupdate = false
+    tag = false
