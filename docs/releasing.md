@@ -192,18 +192,28 @@ independently authenticate an agent or reviewer.
 
 ## Finish and publish
 
-Merge the reviewed release PR into `main` using a merge commit. Record the
-exact merge commit SHA shown by GitHub as `<PR_MERGE_COMMIT_SHA>`; use that SHA
-rather than whichever commit `main` happens to point at later. Update `develop`
-from `main`, then create and push the component tag on the merge commit:
+Merge the reviewed release PR into `main` using a merge commit. The **Sync
+develop after release** workflow validates the merged release or hotfix PR,
+then uses Git Flow Next to update `develop` from `main`. It uses the preparation
+App's repository-scoped token, so the App must be permitted to push to `develop`.
+It neither creates tags nor publishes packages. Wait for this workflow and the
+resulting CI run before continuing. A concurrent update or a conflict fails the
+workflow without force-pushing; resolve it and run the workflow again.
+
+For a release merged before the workflow existed, or to retry after a failure,
+run **Sync develop after release** manually from `develop` and provide the merged
+release PR number. Manual dispatch is restricted to the maintainer. GitHub only
+offers manual workflows present on the default branch. For manual conflict
+resolution, fetch `main` and `develop`, update `develop` from `main`, review the
+result, and push it before retrying.
+
+Record the exact merge commit SHA shown by GitHub as `<PR_MERGE_COMMIT_SHA>`;
+use that SHA rather than whichever commit `main` happens to point at later. Once
+the synchronization succeeds, create and push the component tag:
 
 ```sh
 git fetch origin --tags
 git merge-base --is-ancestor <PR_MERGE_COMMIT_SHA> origin/main
-git switch develop
-git pull --ff-only origin develop
-git merge --no-ff origin/main
-git push origin develop
 git tag -a cli-v0.2.0 <PR_MERGE_COMMIT_SHA> -m "cli-v0.2.0"
 git push origin refs/tags/cli-v0.2.0
 ```
