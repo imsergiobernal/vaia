@@ -1,0 +1,28 @@
+{
+  "extends": ["@commitlint/config-conventional"],
+  "rules": {
+    "scope-empty": [0],
+    "scope-enum": [
+      2,
+      "always",
+      {
+        "scopes": ["cli", "sdk", "openapi", "release", "workspace", "tooling"],
+        "delimiters": [","]
+      }
+    ],
+    "scope-case": [
+      2,
+      "always",
+      {
+        "cases": ["lower-case"],
+        "delimiters": [","]
+      }
+    ],
+    "scope-delimiter-style": [2, "always", [","]],
+    "type-enum": [
+      2,
+      "always",
+      ["build", "chore", "ci", "docs", "feat", "fix", "perf", "refactor", "revert", "style", "test", "deps"]
+    ]
+  }
+}
