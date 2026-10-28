@@ -157,10 +157,12 @@ test('keeps existing notes on repeated runs and never creates a separate PR', as
   const { github, options, messages } = fixture(t);
   await prepareRelease('release/cli-v0.2.0', options);
   github.commits.unshift({ sha: '5'.repeat(40), message: 'fix(cli): fix stabilization bug', files: ['apps/cli/src/fix.ts'] });
-  await prepareRelease('release/cli-v0.2.0', options);
+  const result = await prepareRelease('release/cli-v0.2.0', options);
   assert.equal(github.created, 0);
   assert.equal(github.updated, 0);
   assert.doesNotMatch(readFileSync(join(options.cwd, 'apps/cli/CHANGELOG.md'), 'utf8'), /fix stabilization bug/);
+  assert.equal(result.changed, false);
+  assert.match(result.draft, /fix stabilization bug/);
   assert.match(messages.at(-1), /Existing.*notes retained/);
 });
 

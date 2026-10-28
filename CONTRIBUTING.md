@@ -84,7 +84,7 @@ flowchart LR
 | [packages/sdk](packages/sdk/) | Typed ESM HTTP client built on `openapi-fetch`, resource methods and generated OpenAPI schema types. |
 | [packages/openapi](packages/openapi/) | OpenAPI 3.0 contract in `openapi.yaml`; workspace-only and never published. |
 | [scripts](scripts/) | Release preparation, notes validation/synchronization, publication validation and notes extraction, with Node.js tests. |
-| [.github/workflows](.github/workflows/) | CI, single-branch release preparation, owner-only notes synchronization and tag-triggered CLI/SDK publication. |
+| [.github/workflows](.github/workflows/) | CI, single-branch release preparation with automatic PR drafts, owner-only manual synchronization fallback and tag-triggered CLI/SDK publication. |
 | [.github/actions](.github/actions/) | Verification of packed CLI and SDK packages outside the workspace. |
 | [docs/releasing.md](docs/releasing.md) | Release and hotfix procedure, Git Flow Next setup and preparation bot configuration. |
 
@@ -99,7 +99,7 @@ flowchart LR
 | `pnpm commitlint --edit <commit-message-file>` | Validate a commit message against the repository's Conventional Commits rules. |
 | `pnpm generate` | Regenerate SDK schema types from the OpenAPI contract. |
 | `pnpm test` | Run `node --test` over `scripts/*.test.mjs`. |
-| `pnpm release:prepare <branch>` | Generate the initial changelog entry in the current checkout; see the [release guide](docs/releasing.md) for branches and required credentials. |
+| `pnpm release:prepare <branch>` | Generate an automatic draft and, if missing, the initial changelog entry; see the [release guide](docs/releasing.md) for branches and required credentials. |
 
 ## Regenerating SDK types
 
@@ -199,5 +199,6 @@ for branch naming, component version preparation, Git Flow Next, Release Please
 and publication. Each release PR goes directly from its release branch to `main`.
 After stabilization, draft notes in your personal Codex session
 and follow the [release notes procedure](docs/releasing.md#draft-final-release-notes).
-Only `imsergiobernal` may run the workflow that synchronizes the committed notes
-into the release PR. Keep the procedures in the release guide.
+The preparation workflow updates the automatic draft and fresh editorial notes
+in the release PR. Only `imsergiobernal` may run the manual synchronization
+fallback. Keep the procedures in the release guide.

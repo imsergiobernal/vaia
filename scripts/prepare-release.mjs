@@ -23,11 +23,11 @@ export async function prepareRelease(branch, {
   let localContent;
   try { localContent = readFileSync(changelogPath, 'utf8'); }
   catch (error) { if (error.code !== 'ENOENT') throw error; }
+  let hasTargetEntry = false;
   if (localContent !== undefined) {
     try {
       extractReleaseNotes(localContent, release.version);
-      log(`Existing ${release.tag} notes retained in ${changelog}; update them manually if the candidate changes.`);
-      return { release, changelog, changed: false };
+      hasTargetEntry = true;
     } catch (error) {
       if (!error.message.includes('found 0.')) throw error;
     }
@@ -44,10 +44,15 @@ export async function prepareRelease(branch, {
     // Generate a candidate without creating Release Please's separate branch or PR.
     const candidates = await manifest.buildPullRequests();
     if (candidates.length === 0) {
-      log(`No releasable changes found for ${release.tag}; no changelog was written.`);
-      return { release, changelog, changed: false };
+      log(`No releasable changes found for ${release.tag}; existing notes are retained.`);
+      return { release, changelog, changed: false, draft: null };
     }
     if (candidates.length !== 1) throw new Error('Expected a single component release candidate.');
+    const draft = extractReleaseNotes(candidates[0].body.notes(), release.version);
+    if (hasTargetEntry) {
+      log(`Existing ${release.tag} notes retained in ${changelog}; refreshed the automatic draft separately.`);
+      return { release, changelog, changed: false, draft };
+    }
     const updates = candidates[0].updates.filter((update) => update.path === changelog);
     if (updates.length === 0) throw new Error(`Release Please did not produce ${changelog}.`);
     const changes = await github.buildChangeSet(updates, branch);
@@ -58,7 +63,7 @@ export async function prepareRelease(branch, {
     extractReleaseNotes(change.content, release.version);
     writeFileSync(changelogPath, change.content);
     log(`Prepared ${release.tag} notes in ${changelog}; no branch, PR, tag or package was created.`);
-    return { release, changelog, changed: true };
+    return { release, changelog, changed: true, draft };
   } catch (error) {
     if (error.status === 401 || error.status === 403) {
       throw new Error('Release Please authentication failed. Check the GitHub App installation and permissions.', { cause: error });
@@ -74,7 +79,10 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
   } else {
     try {
       if (args.length !== 1) throw new Error('Usage: pnpm release:prepare <release|hotfix>/<cli|sdk>-vX.Y.Z');
-      await prepareRelease(args[0]);
+      const result = await prepareRelease(args[0]);
+      if (process.env.RELEASE_DRAFT_FILE) {
+        writeFileSync(resolve(process.env.RELEASE_DRAFT_FILE), result.draft ?? '', 'utf8');
+      }
     } catch (error) {
       console.error(error.message);
       process.exitCode = 1;

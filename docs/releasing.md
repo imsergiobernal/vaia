@@ -115,16 +115,22 @@ correct (for example, the first `0.1.0` release), skip the version command and
 commit.
 
 Each push runs the **Prepare release branch** workflow. Release Please uses the
-branch's component and target version to generate the first changelog entry from
-component history. The workflow commits that entry to the release branch and
-opens a single PR to `main`; later pushes update that same PR. The App needs
-permission to push to the release branch; branch protection must permit the App.
+branch's component, existing commit selection and target version to generate a
+draft from component history. The workflow commits an initial changelog entry
+when needed and opens a single PR to `main`. On later pushes it refreshes the
+automatic draft in the PR description without creating a commit or overwriting
+the existing changelog entry. The App needs permission to push to the release
+branch and update its PR; branch protection must permit the App.
 
-An existing entry for the target version is retained, so repeated runs never
-silently overwrite manually drafted notes. After source changes, update and review
-the entry again before merging. If no releasable commits exist, preparation fails
-rather than opening a PR without notes. For a CLI release containing only SDK
-changes, use a `deps(cli)` commit touching the CLI manifest.
+The automatic draft is a working list, not the final public wording: commits may
+describe internal or intermediate changes. Before merging, consolidate the final
+user-facing notes in the component's changelog as described below. The workflow
+automatically copies fresh editorial notes into the PR. If later changes make the
+notes stale, it keeps the authored text and prominently marks the PR as requiring
+another editorial review. It does not automatically block the merge; check the
+status and review the PR before merging. If no releasable commits exist, preparation
+fails rather than opening a PR without notes. For a CLI release containing only
+SDK changes, use a `deps(cli)` commit touching the CLI manifest.
 
 For local preparation set `GITHUB_REPOSITORY=imsergiobernal/vaia` and
 `RELEASE_PLEASE_TOKEN` to an installation token from the same App, then run:
@@ -134,8 +140,10 @@ pnpm release:prepare release/cli-v0.2.0
 ```
 
 This writes the changelog in the checkout only if the entry does not already
-exist. It does not create a branch, commit, PR, tag or publication. Never put
-credentials on the command line or commit them in a configuration file.
+exist. It also generates a fresh automatic draft in memory; set `RELEASE_DRAFT_FILE`
+to a local output path to save it separately. It does not create a branch,
+commit, PR, tag or publication. Never put credentials on the command line or
+commit them in a configuration file.
 
 Use the branch for corrections, documentation and package preparation. Continue
 new features on `develop`. Do not bump the other component just to match versions.
@@ -153,13 +161,12 @@ local packed SDK so development does not require publishing either package.
 
 ## Draft final release notes
 
-The maintainer `imsergiobernal` (GitHub user ID `20087388`) drafts notes in a
-personal Codex session. The **Sync release notes** workflow runs manually from
-`develop` in `imsergiobernal/vaia` and checks the original actor and rerun actor.
-It uses trusted scripts from `develop`, reads the release branch's committed
-changelog and updates only the PR body; it does not start Codex, merge or publish.
-Keep the Codex environment private; repository prompts and markers do not
-independently authenticate an agent or reviewer.
+The maintainer `imsergiobernal` (GitHub user ID `20087388`) drafts the final
+notes in a personal Codex session. On every push to the release branch, the
+preparation workflow refreshes the automatic draft and editorial status in the
+PR using its scoped App token; it does not start Codex, merge or publish. Keep
+the Codex environment private; repository prompts and markers do not independently
+authenticate an agent, reviewer or approval.
 
 1. Wait for **Prepare release branch** and open the PR from the release branch
    to `main`. Stabilize source and dependency changes on that same branch.
@@ -175,12 +182,14 @@ independently authenticate an agent or reviewer.
    <!-- vaia-release-notes {"component":"cli","version":"0.2.0","candidate":"<40-character-candidate-sha>","previous_tag":"cli-v0.1.0"} -->
    ```
 
-4. In **Actions > Sync release notes > Run workflow**, select `develop` and
-   provide the release PR number. The workflow must already exist on the default
-   branch before GitHub offers its manual trigger. The synchronizer requires the
+4. The next **Prepare release branch** run copies fresh editorial notes into the
+   PR and displays the separate automatic draft. The synchronizer requires the
    candidate to be an ancestor of the release head and permits only the component
    changelog to differ from that candidate. It preserves existing PR text and
-   replaces only its own notes block. Redraft after later source changes.
+   replaces only its own blocks. If the PR says editorial review is required,
+   redraft and push the notes before merging. GitHub does not provide an atomic
+   PR-body compare-and-swap; the workflow rechecks the PR immediately before
+   updating and fails if it observes a concurrent edit.
 5. Review the changelog and PR, wait for CI, and run the same checks locally:
 
    ```sh
@@ -189,6 +198,11 @@ independently authenticate an agent or reviewer.
    pnpm --filter '@imsergiobernal/vaia-cli...' --fail-if-no-match -r run build
    pnpm --filter '@imsergiobernal/vaia-cli...' --fail-if-no-match -r run typecheck
    ```
+
+The existing **Sync release notes** workflow remains available as a manual
+fallback from `develop`; it only runs for `imsergiobernal` and checks both the
+original actor and rerun actor. Its workflow file must exist on the default
+branch before GitHub offers the manual trigger.
 
 ## Finish and publish
 

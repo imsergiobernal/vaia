@@ -89,9 +89,11 @@ jobs:
       - name: Prepare the changelog on the release branch
         env:
           RELEASE_PLEASE_TOKEN: ${{ steps.app-token.outputs.token }}
+          RELEASE_DRAFT_FILE: ${{ runner.temp }}/release-draft.md
         run: pnpm release:prepare "$RELEASE_BRANCH"
 
       - name: Commit prepared notes and open the release PR
+        id: release-pr
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           GH_REPO: ${{ github.repository }}
@@ -119,9 +121,22 @@ jobs:
           node --input-type=module -e 'import { validateReleaseBranch } from "./scripts/validate-release.mjs"; import { readReleaseNotes } from "./scripts/release-notes.mjs"; readReleaseNotes(validateReleaseBranch(process.env.RELEASE_BRANCH));'
           existing="$(gh pr list --head "$RELEASE_BRANCH" --base main --state open --json number --jq '.[0].number // empty')"
           if [[ -z "$existing" ]]; then
-            gh pr create --head "$RELEASE_BRANCH" --base main \
+            created="$(gh pr create --head "$RELEASE_BRANCH" --base main \
               --title "chore($component): prepare $version" \
-              --body "Review the $component $version release and its changelog before merging."
+              --body "Review the $component $version release and its changelog before merging.")"
+            existing="${created##*/}"
           else
             echo "Release PR #$existing already exists."
           fi
+          if [[ ! "$existing" =~ ^[1-9][0-9]*$ ]]; then
+            echo '::error::Could not determine the release PR number.'
+            exit 1
+          fi
+          echo "number=$existing" >> "$GITHUB_OUTPUT"
+
+      - name: Update the automatic draft and editorial review status
+        env:
+          RELEASE_PLEASE_TOKEN: ${{ steps.app-token.outputs.token }}
+          RELEASE_PR: ${{ steps.release-pr.outputs.number }}
+          RELEASE_DRAFT_FILE: ${{ runner.temp }}/release-draft.md
+        run: node scripts/update-release-pr.mjs "$RELEASE_PR" "$RELEASE_DRAFT_FILE"

@@ -29,7 +29,8 @@ For an open same-repository PR from `release/<component>-vX.Y.Z` or
 6. Report the source evidence and uncertainties. Do not invent release content,
    update the PR body directly, merge, create tags, publish or send public comments.
 
-After review, the maintainer runs **Sync release notes** from `develop` with the
-release PR number. GitHub Actions only copies the committed entry into the PR
-body; it does not start Codex or access a Codex account. The workflow verifies the
-pinned maintainer and freshness, and does not merge or publish anything.
+After the notes commit is pushed, **Prepare release branch** checks freshness and
+copies the committed entry into the release PR body. Its separate automatic
+draft remains a working list. This workflow does not start Codex, access a Codex
+account, merge or publish anything. The owner-only **Sync release notes**
+workflow remains available as a manual fallback from `develop`.
