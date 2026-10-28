@@ -101,21 +101,24 @@ jobs:
           retention-days: 7
 
   release:
-    name: Publish CLI to GitHub Packages and Releases
+    name: Stage CLI for approval and draft GitHub Release
     needs: build
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
       contents: write
-      packages: write
+      id-token: write
     steps:
-      - name: Set up Node.js and GitHub Packages authentication
+      - name: Set up Node.js and npm registry
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
-          node-version: '22'
+          node-version: '24'
           package-manager-cache: false
-          registry-url: https://npm.pkg.github.com
+          registry-url: https://registry.npmjs.org
           scope: '@imsergiobernal'
+
+      - name: Install npm with staged publishing support
+        run: npm install --global npm@11.19.0 --registry https://registry.npmjs.org --ignore-scripts
 
       - name: Download verified release assets
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
@@ -123,20 +126,28 @@ jobs:
           name: cli-release
           path: release-assets
 
-      - name: Publish the verified CLI package
+      - name: Stage the verified CLI package for manual approval
         env:
-          NODE_AUTH_TOKEN: ${{ github.token }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           SDK_DEPENDENCY: ${{ needs.build.outputs.sdk_dependency }}
         run: |
           cd release-assets
           sha256sum --check SHA256SUMS
-          if ! npm view "$SDK_DEPENDENCY" version --registry https://npm.pkg.github.com; then
-            echo "::error::Publish $SDK_DEPENDENCY with its sdk-v tag before publishing the CLI."
+          if ! npm view "$SDK_DEPENDENCY" version --registry https://registry.npmjs.org; then
+            echo "::error::Approve $SDK_DEPENDENCY in npm Staged Packages before staging the CLI."
             exit 1
           fi
-          npm publish ./*.tgz --registry https://npm.pkg.github.com --ignore-scripts
+          npm stage publish ./*.tgz --registry https://registry.npmjs.org --access public --ignore-scripts
+          cat <<'MARKDOWN' >> "$GITHUB_STEP_SUMMARY"
+          ## CLI awaiting npm approval
 
-      - name: Publish release with the prepared changelog notes
+          The verified CLI package is staged; this run does not publish it to npm.
+          Open [npm Staged Packages](https://www.npmjs.com/settings/imsergiobernal/staged-packages),
+          review the package name and version, then select **Approve** and complete 2FA.
+          After npm approval, publish the matching draft in GitHub Releases.
+          MARKDOWN
+
+      - name: Create draft release with the prepared changelog notes
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -145,6 +156,7 @@ jobs:
           cd release-assets
           sha256sum --check SHA256SUMS
           gh release create "$RELEASE_TAG" ./*.tar.gz ./*.tgz SHA256SUMS \
+            --draft \
             --verify-tag \
             --title "Vaia CLI $RELEASE_TAG" \
             --notes-file release-notes.md

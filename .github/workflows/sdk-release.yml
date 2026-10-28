@@ -83,21 +83,24 @@ jobs:
           retention-days: 7
 
   release:
-    name: Publish SDK to GitHub Packages and Releases
+    name: Stage SDK for approval and draft GitHub Release
     needs: build
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
       contents: write
-      packages: write
+      id-token: write
     steps:
-      - name: Set up Node.js and GitHub Packages authentication
+      - name: Set up Node.js and npm registry
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
-          node-version: '22'
+          node-version: '24'
           package-manager-cache: false
-          registry-url: https://npm.pkg.github.com
+          registry-url: https://registry.npmjs.org
           scope: '@imsergiobernal'
+
+      - name: Install npm with staged publishing support
+        run: npm install --global npm@11.19.0 --registry https://registry.npmjs.org --ignore-scripts
 
       - name: Download verified SDK assets
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
@@ -105,15 +108,24 @@ jobs:
           name: sdk-release
           path: release-assets
 
-      - name: Publish the verified SDK package
+      - name: Stage the verified SDK package for manual approval
         env:
-          NODE_AUTH_TOKEN: ${{ github.token }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           cd release-assets
           sha256sum --check SHA256SUMS
-          npm publish ./*.tgz --registry https://npm.pkg.github.com --ignore-scripts
+          npm stage publish ./*.tgz --registry https://registry.npmjs.org --access public --ignore-scripts
+          cat <<'MARKDOWN' >> "$GITHUB_STEP_SUMMARY"
+          ## SDK awaiting npm approval
 
-      - name: Publish SDK GitHub Release
+          The verified SDK package is staged; this run does not publish it to npm.
+          Open [npm Staged Packages](https://www.npmjs.com/settings/imsergiobernal/staged-packages),
+          review the package name and version, then select **Approve** and complete 2FA.
+          Approve the SDK before triggering a CLI release that depends on it.
+          After npm approval, publish the matching draft in GitHub Releases with **Set as latest release** disabled.
+          MARKDOWN
+
+      - name: Create draft SDK GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -121,6 +133,7 @@ jobs:
         run: |
           cd release-assets
           gh release create "$RELEASE_TAG" ./*.tgz SHA256SUMS \
+            --draft \
             --verify-tag \
             --title "Vaia SDK $RELEASE_TAG" \
             --notes-file release-notes.md \

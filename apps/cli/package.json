@@ -9,7 +9,8 @@
     "directory": "apps/cli"
   },
   "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
+    "registry": "https://registry.npmjs.org",
+    "access": "public"
   },
   "bin": {
     "vaia": "./dist/bin/run.js"

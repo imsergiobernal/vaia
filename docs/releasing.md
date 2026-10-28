@@ -53,6 +53,44 @@ Missing configuration or rejected authentication fails with a configuration
 message; there is no fallback to `GITHUB_TOKEN`. Using the App allows the existing
 PR CI to run automatically on its preparation PRs.
 
+## Configure npm publication
+
+Both packages publish publicly to `https://registry.npmjs.org` under the
+`@imsergiobernal` scope. The npm account or organization must own that scope and
+the publishing identity must have write access to both packages.
+
+The publication jobs use Node.js 24 and npm 11.19.0. Staged publishing requires
+at least npm 11.15.0. Build and consumer checks continue to use Node.js 22.
+
+Enable 2FA on the npm account that will approve releases. Create an npm granular
+access token with write access to this scope, preferably **Read and write (stage
+only)**, and leave **Bypass 2FA disabled**. Save it as the repository Actions
+secret `NPM_TOKEN`. An existing token with **Read and write (publish and stage)**
+and bypass disabled can also stage packages. Never commit the token or paste it
+into release notes. Replace the secret when the token expires.
+
+The workflows run `npm stage publish` against the verified tarball. This uploads
+the release for review without prompting the runner for 2FA. You approve it
+separately on npm with your own 2FA. Staging also supports the first release of
+a new package; npm creates a public `0.0.0-stage` placeholder while the actual
+staged version's contents remain unavailable until approval. See
+[npm staged publishing](https://docs.npmjs.com/staged-publishing/).
+
+To avoid renewing tokens later, configure [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/)
+in each package's npm settings with these values:
+
+| Package | GitHub owner | Repository | Workflow filename |
+| --- | --- | --- | --- |
+| `@imsergiobernal/vaia-sdk` | `imsergiobernal` | `vaia` | `sdk-release.yml` |
+| `@imsergiobernal/vaia-cli` | `imsergiobernal` | `vaia` | `cli-release.yml` |
+
+Leave the environment name empty and allow **staging only** (`npm stage publish`),
+with direct publishing disabled. The publication jobs grant `id-token: write`
+for OIDC; manual approval with 2FA remains required. Complete the first successful
+use within npm's initial validation window (currently two days); recreate the
+configuration if it expires. Once both workflows successfully stage through
+OIDC, remove `NPM_TOKEN`. `GITHUB_TOKEN` is used to create draft GitHub Releases.
+
 ## Open and stabilize a release
 
 Start from a clean working tree and update the target component's version as part
@@ -116,8 +154,9 @@ It does not publish the CLI.
 The CLI package is published as `@imsergiobernal/vaia-cli` and exposes the `vaia`
 command. Packing converts its workspace SDK dependency into the exact current
 `@imsergiobernal/vaia-sdk` version. Publish that SDK version with its `sdk-vX.Y.Z`
-tag before pushing the CLI tag; an already published SDK version can be reused.
-The CLI publisher checks that dependency in GitHub Packages before publishing,
+tag and approve it in npm before pushing the CLI tag; an already published SDK
+version can be reused.
+The CLI publisher checks that dependency in npm before publishing,
 and fails with a message if it is unavailable. CI tests the CLI tarball with a
 local packed SDK so development does not require publishing either package.
 
@@ -227,15 +266,16 @@ Do not publish all tags together. The tag triggers only the matching workflow:
 
 - `cli-v*`: checks the CLI version and `main` history, builds the CLI and SDK,
   installs and verifies the packed CLI outside the workspace, verifies the
-  extracted production bundle, publishes the same CLI `.tgz` to GitHub Packages,
-  and attaches both archives to a GitHub Release.
+  extracted production bundle, stages the same CLI `.tgz` in npm for approval,
+  and attaches both archives to a draft GitHub Release.
 - `sdk-v*`: checks the SDK version and `main` history, verifies CLI compatibility,
   installs the packed SDK in an isolated consumer, checks its runtime and types,
-  and publishes that same `.tgz` to GitHub Packages and GitHub Releases.
+  and stages that same `.tgz` in npm for approval, attaching it to a draft
+  GitHub Release.
 
 The SDK GitHub Release does not replace the CLI as the repository's latest
-release. Publishing uses the workflow's `GITHUB_TOKEN`; only publication jobs
-receive write permissions. GitHub Packages installation instructions are in
+release. npm staging uses OIDC or the `NPM_TOKEN` described above;
+only publication jobs receive write permissions. npm installation instructions are in
 `apps/cli/README.md` and `packages/sdk/README.md`.
 
 Both publishers require a single, nonempty `CHANGELOG.md` entry matching the
@@ -244,7 +284,7 @@ entry to `release-notes.md`, which travels with the verified assets and becomes
 the GitHub Release body. Missing, duplicate or empty entries fail before building
 or publishing; notes from another component or version are never substituted.
 
-Branch pushes validate and prepare PRs; only tags publish. CI checks release/hotfix
+Branch pushes validate and prepare PRs; tags stage packages for approval. CI checks release/hotfix
 names and manifest versions on both PR head and target branches. A tag must match its own
 component's manifest, and its exact commit must already be an ancestor of
 `origin/main`. Full history is fetched for that check. Older integrated tags can
@@ -260,7 +300,33 @@ Confirm that exactly one preparation PR targets that branch, its CI runs, an
 additional fix updates the same PR, and merging the PR does not create a tag,
 GitHub Release, package version or second preparation PR. Only then finish the
 release with Gitflow and push the tag. Avoid disposable test tags: a matching
-tag integrated into `main` is a real publication trigger.
+tag integrated into `main` is a real staging trigger.
+
+### Approve and publish the release
+
+A green release workflow means the package is staged and the GitHub Release is
+a draft. The workflow finishes without waiting for a 2FA code. Its run summary
+links to npm and explains the remaining steps:
+
+1. Open [npm Staged Packages](https://www.npmjs.com/settings/imsergiobernal/staged-packages).
+   Review the package name and version against the release tag and inspect the
+   staged tarball if needed.
+2. Select **Approve** and complete npm's 2FA verification. This makes the version
+   available on npm. For an SDK release, finish this before triggering a CLI
+   release that depends on that exact SDK version.
+3. In this repository's **Releases**, edit the matching draft and publish it.
+   For an SDK release, leave **Set as latest release** disabled; the CLI remains
+   the repository's latest release.
+
+You can also approve from a local authenticated terminal with
+`npm stage approve <stage-id>`, which prompts for 2FA. Do not supply a 2FA code
+to GitHub Actions or store it as a secret.
+
+If approval is rejected or abandoned, the actual release version remains
+unpublished and the GitHub Release stays a draft. Staged versions reserve their
+package/version pair: do not rerun staging just to approve it. If a workflow
+fails after staging, inspect the existing staged package and draft before
+retrying; recover the draft from the verified run artifacts as needed.
 
 ## Hotfixes
 

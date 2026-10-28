@@ -3,29 +3,33 @@
 CLI for browsing Vaia study sets and subsets, managing flashcards, and managing
 tags through `@imsergiobernal/vaia-sdk`.
 
-## Install from GitHub Packages
+## Install from npm
 
-Use Node.js 22 or newer. Configure the scope in your user npm configuration so
-global installations resolve both the CLI and its SDK dependency from GitHub Packages:
+Use Node.js 22 or newer. The CLI and its SDK dependency are public npm packages:
 
 ```sh
-npm config set @imsergiobernal:registry https://npm.pkg.github.com --location=user
-npm login --scope=@imsergiobernal --registry=https://npm.pkg.github.com --auth-type=legacy
 npm install --global @imsergiobernal/vaia-cli
 vaia --help
 vaia config set-token
 vaia studysets list
 ```
 
-Authenticate with a GitHub personal access token (classic) with `read:packages`
-and access to both packages. Keep the token in your user configuration, never in
-the repository. `vaia config set-token` then prompts for your **Vaia API token**;
-the GitHub token is only used to install packages.
+Package installation does not require authentication. `vaia config set-token`
+prompts for your **Vaia API token** to access Vaia content.
 
-Each `cli-vX.Y.Z` release publishes the verified npm tarball to GitHub Packages
-and attaches it alongside the standalone production bundle to GitHub Releases.
+If you previously used GitHub Packages, update your user configuration and any
+project `.npmrc` that overrides this scope:
+
+```sh
+npm config set @imsergiobernal:registry https://registry.npmjs.org --location=user
+```
+
+Each `cli-vX.Y.Z` release stages the verified npm tarball for manual approval
+with 2FA and attaches it alongside the standalone production bundle to a draft
+GitHub Release. Approve the package in npm, then publish the GitHub Release draft.
 The CLI depends on the exact SDK version present when it is packed; that SDK
-version must be published before the CLI. See [the release procedure](../../docs/releasing.md).
+version must be approved and published before staging the CLI.
+See [the release procedure](../../docs/releasing.md).
 
 ## Run locally
 

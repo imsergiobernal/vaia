@@ -72,8 +72,10 @@ where pnpm runs the script. Full command and configuration details are in the
 flowchart LR
     A["packages/openapi<br/>openapi.yaml"] -->|openapi-typescript| B["packages/sdk<br/>@imsergiobernal/vaia-sdk"]
     B --> C["apps/cli<br/>@imsergiobernal/vaia-cli (oclif)"]
-    C --> D1["GitHub Packages + GitHub Release"]
-    B --> D2["GitHub Packages + GitHub Release"]
+    C --> D1["npm staging + draft GitHub Release"]
+    B --> D2["npm staging + draft GitHub Release"]
+    D1 --> E1["Manual npm approval with 2FA + publish GitHub Release"]
+    D2 --> E2["Manual npm approval with 2FA + publish GitHub Release"]
 ```
 
 | Path | Responsibility |

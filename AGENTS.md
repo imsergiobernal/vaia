@@ -6,8 +6,8 @@ Vaia is an open-source toolkit for managing [Vaia](https://www.vaia.com) content
 
 | Path | Package | Role |
 | --- | --- | --- |
-| `apps/cli` | `@imsergiobernal/vaia-cli` | oclif-based CLI (interactive menu + scriptable commands). Published to GitHub Packages; exposes the `vaia` executable. |
-| `packages/sdk` | `@imsergiobernal/vaia-sdk` | Typed ESM HTTP client for the Vaia API (`openapi-fetch`). Published to GitHub Packages with independent versioning. |
+| `apps/cli` | `@imsergiobernal/vaia-cli` | oclif-based CLI (interactive menu + scriptable commands). Published to the public npm registry; exposes the `vaia` executable. |
+| `packages/sdk` | `@imsergiobernal/vaia-sdk` | Typed ESM HTTP client for the Vaia API (`openapi-fetch`). Published to the public npm registry with independent versioning. |
 | `packages/openapi` | `@vaia/openapi` | OpenAPI 3.0 contract; single source of truth for SDK types. Workspace-only, never published. |
 
 Key technologies: TypeScript (strict), Node.js 22+, ESM (`"type": "module"`), oclif, openapi-typescript, pnpm workspaces.
@@ -103,8 +103,8 @@ fix(cli/sdk): handle empty responses
 - Branch format: `release/<component>-v<MAJOR.MINOR.PATCH>` or `hotfix/<component>-v<...>` where `<component>` is `cli` or `sdk`. The branch names the final target version (stable SemVer, no prerelease suffixes).
 - Bump exactly one component's manifest per release branch: `pnpm --dir apps/cli version X.Y.Z --no-git-tag-version` (or `packages/sdk`). Never bump the other package "to match".
 - Write **Conventional Commits** (`feat`, `fix`, `deps`, breaking-change markers) — generated changelogs depend on them. A CLI release that only incorporates SDK changes should use a `deps(cli)` commit touching the CLI manifest.
-- Only tags (`cli-v*`, `sdk-v*`) trigger publication, and only after the tagged commit is verified as an ancestor of `main`. Merging the Release Please preparation PR does not publish anything.
-- When publishing the CLI, its SDK dependency version must already be published to GitHub Packages (publish the matching `sdk-vX.Y.Z` tag first).
+- Tags (`cli-v*`, `sdk-v*`) stage packages in npm for manual approval with 2FA and create draft GitHub Releases, after verifying the tagged commit is an ancestor of `main`. Merging the Release Please preparation PR does not publish anything. Approve in npm before publishing the GitHub Release draft.
+- When staging the CLI, its SDK dependency version must already be approved and published to npm (push and approve the matching `sdk-vX.Y.Z` tag first).
 
 ## Pull Request Guidelines
 

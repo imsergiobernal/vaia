@@ -3,7 +3,7 @@
 **Open-source toolkit for managing your [Vaia](https://www.vaia.com) content — study sets, flashcards and tags — from the terminal or any Node.js application.**
 
 Use the interactive and scriptable CLI from your terminal, or the typed ESM SDK
-from your Node.js application. Both are published to GitHub Packages.
+from your Node.js application. Both are published to the public npm registry.
 
 [![CI](https://github.com/imsergiobernal/vaia/actions/workflows/ci.yml/badge.svg)](https://github.com/imsergiobernal/vaia/actions/workflows/ci.yml)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D22-blue?logo=node.js&logoColor=white)](https://nodejs.org/)
@@ -21,17 +21,13 @@ from your Node.js application. Both are published to GitHub Packages.
 
 ## Quick start
 
-### CLI (from GitHub Packages)
+### CLI (from npm)
 
 Use Node.js 22 or newer.
 
-Configure the registry in your user npm configuration and authenticate with a
-GitHub personal access token (classic) with `read:packages` and access to the CLI
-and SDK packages:
+Install the CLI directly from npm; package installation does not require authentication:
 
 ```sh
-npm config set @imsergiobernal:registry https://npm.pkg.github.com --location=user
-npm login --scope=@imsergiobernal --registry=https://npm.pkg.github.com --auth-type=legacy
 npm install --global @imsergiobernal/vaia-cli
 vaia config set-token
 vaia
@@ -39,19 +35,16 @@ vaia studysets list
 vaia flashcards list 71434395
 ```
 
-`config set-token` prompts for your **Vaia API token**, which is separate from the
-GitHub token used to install packages. Replace the example study set ID with one
+`config set-token` prompts for your **Vaia API token**. Replace the example study set ID with one
 returned by `vaia studysets list`.
 
 To run the CLI from a checkout, follow the [local development guide](CONTRIBUTING.md#development).
 
 Full command reference, flags and examples live in [`apps/cli/README.md`](apps/cli/README.md).
 
-### SDK (from GitHub Packages)
+### SDK (from npm)
 
 ```sh
-npm config set @imsergiobernal:registry https://npm.pkg.github.com --location=user
-npm login --scope=@imsergiobernal --registry=https://npm.pkg.github.com --auth-type=legacy
 npm install @imsergiobernal/vaia-sdk
 ```
 
@@ -63,7 +56,14 @@ const client = createClient({ token: process.env.VAIA_API_TOKEN });
 const studysets = await client.studysets.list();
 ```
 
-Registry configuration and authentication details are in [`packages/sdk/README.md`](packages/sdk/README.md).
+If you previously installed from GitHub Packages, update your user configuration
+so both packages resolve from npm:
+
+```sh
+npm config set @imsergiobernal:registry https://registry.npmjs.org --location=user
+```
+
+Update any project `.npmrc` that overrides this scope as well.
 
 ### Authentication
 
@@ -93,7 +93,9 @@ pass those values explicitly in your application.
 | [`packages/openapi`](packages/openapi/) | `@vaia/openapi` | OpenAPI contract that drives SDK type generation; workspace-only. |
 
 CLI and SDK are versioned and published independently. The publication procedure
-is documented in the [release and hotfix guide](docs/releasing.md).
+requires manual approval with 2FA in npm after each tag-triggered staging run,
+followed by publishing the GitHub Release draft. See the
+[release and hotfix guide](docs/releasing.md).
 
 ## Contributing
 
