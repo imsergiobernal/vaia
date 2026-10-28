@@ -1,0 +1,10 @@
+{
+    "conventionalCommits.scopes": [
+        "cli",
+        "sdk",
+        "openapi",
+        "release",
+        "workspace",
+        "tooling"
+    ]
+}

@@ -19,8 +19,9 @@ Key technologies: TypeScript (strict), Node.js 22+, ESM (`"type": "module"`), oc
 - Type-check the whole workspace: `pnpm typecheck`
 - Run tests: `pnpm test`
 - Regenerate SDK types from the OpenAPI contract: `pnpm generate`
+- Validate a commit message file: `pnpm commitlint --edit <commit-message-file>`
 
-Prerequisites: Node.js 22+ and pnpm 12.6.0 (pinned in `package.json` via `packageManager`/`devEngines`; corepack downloads it automatically).
+Prerequisites: Node.js 22.12+ (required by commitlint) and pnpm 12.6.0 (pinned in `package.json` via `packageManager`/`devEngines`; corepack downloads it automatically).
 
 ## Development Workflow
 
@@ -37,7 +38,7 @@ Prerequisites: Node.js 22+ and pnpm 12.6.0 (pinned in `package.json` via `packag
 
 ## Code Style
 
-- TypeScript strict mode everywhere; `target: ES2022`, `module/moduleResolution: NodeNext`. No linter or formatter is configured — match existing code style manually.
+- TypeScript strict mode everywhere; `target: ES2022`, `module/moduleResolution: NodeNext`. No source-code linter or formatter is configured — match existing code style manually.
 - ESM only: use explicit `.js` extensions in relative imports of compiled output where required by NodeNext resolution.
 - **Never hand-edit generated files**: `packages/sdk/src/generated/schema.ts` (and the generated client) come from `pnpm generate`. After changing `packages/openapi/openapi.yaml`, run `pnpm generate`, then `pnpm build` and `pnpm typecheck`.
 - Keep changes scoped per package; CLI depends on SDK via `workspace:*`.
@@ -46,6 +47,55 @@ Prerequisites: Node.js 22+ and pnpm 12.6.0 (pinned in `package.json` via `packag
 
 - CI (`.github/workflows/ci.yml`) runs: branch-name validation for `release/*`/`hotfix/*` (`node scripts/validate-release.mjs branch <branch>`), `pnpm install --frozen-lockfile`, `pnpm test`, build + typecheck of the CLI subtree, CLI smoke checks (`node apps/cli/dist/bin/run.js --help`, etc.), and out-of-workspace verification of packed SDK/CLI tarballs (`.github/actions/verify-sdk`, `.github/actions/verify-cli`).
 - Reproduce CI locally before pushing: `pnpm build && pnpm typecheck && pnpm test`.
+
+## Commit Message Conventions
+
+Use Conventional Commits with the root `.commitlintrc`, extending
+`@commitlint/config-conventional`. Scopes are optional, lowercase, and restricted
+to the following catalog. Multiple scopes use a comma: `fix(cli,sdk): ...`.
+
+Write short descriptions in English, starting with an imperative verb in
+lowercase (`add`, `fix`, `update`, or `remove`) and without a final period, e.g.,
+`feat(cli): add tag filtering`. This is the project's writing convention;
+Conventional Commits itself requires a short summary without prescribing a verb
+mood. Commitlint does not check the language or verb mood.
+
+| Scope | Responsibility |
+| --- | --- |
+| `cli` | CLI commands, interactive menu, configuration, and documentation. |
+| `sdk` | HTTP client, SDK resources, and SDK documentation. |
+| `openapi` | OpenAPI contract and type regeneration resulting from its changes. |
+| `release` | Version preparation, validation, and publication automation, including Gitflow. |
+| `workspace` | Monorepo structure, pnpm, shared configuration, and general CI. |
+| `tooling` | Development tools, editor configuration, agent instructions, and commitlint. |
+
+- Choose scopes by the purpose of the change: updating pnpm uses `workspace`, adding commitlint uses `tooling`, and fixing publication uses `release`.
+- Use multiple scopes when a change affects several areas. Omit the scope for general changes when listing areas would not help.
+- Documentation, tests, and dependencies use the commit type: `docs(cli)`, `test(release)`, and `deps(sdk)`. The allowed types are the conventional preset's types plus `deps`.
+- Preparing a package version keeps the component scope: `chore(cli): prepare 0.2.0` or `chore(sdk): prepare 0.3.0`.
+- Validate messages with `pnpm commitlint --edit <commit-message-file>`, or pipe a message into `pnpm commitlint`. This command validates messages without matching scopes to changed files.
+- Apply the convention to new messages; do not rewrite existing history. Keep commitlint's default ignores for automatic merge and revert messages.
+- See the official [commitlint rules](https://commitlint.js.org/reference/rules.html) for the scope enum, case, and delimiter configuration.
+
+Accepted examples:
+
+```text
+feat(cli): add tag filtering
+fix(cli,sdk): handle empty responses
+feat(openapi,sdk): support tag filtering
+docs: clarify installation
+deps(cli): update SDK dependency
+chore(tooling): configure commitlint
+```
+
+Rejected examples (unknown scopes, uppercase scopes, or a non-comma separator):
+
+```text
+feat(api): add an endpoint
+fix(CLI): handle empty responses
+fix(cli,backend): handle empty responses
+fix(cli/sdk): handle empty responses
+```
 
 ## Release Conventions
 
