@@ -24,8 +24,27 @@ npm install @imsergiobernal/vaia-sdk
 ```js
 import { createClient } from '@imsergiobernal/vaia-sdk';
 
+// Set VAIA_API_TOKEN in the environment before running this example.
 const client = createClient({ token: process.env.VAIA_API_TOKEN });
 const studysets = await client.studysets.list();
+```
+
+## Configuration
+
+Pass a raw Vaia API token as `token`; the client sends it as
+`Authorization: Token <token>`. This is separate from the GitHub token used to
+install the package.
+
+The default API base URL is `https://prod.studysmarter.de`. Override it with the
+`baseUrl` option in `createClient()`. The SDK does not automatically read
+`VAIA_API_TOKEN`, `VAIA_API_URL`, or the CLI's saved configuration. To use both
+environment variables explicitly:
+
+```js
+const client = createClient({
+  token: process.env.VAIA_API_TOKEN,
+  baseUrl: process.env.VAIA_API_URL,
+});
 ```
 
 ## Releases
