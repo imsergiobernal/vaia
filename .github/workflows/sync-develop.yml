@@ -50,6 +50,12 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22'
+          package-manager-cache: false
+
       - name: Validate merged PR and main history
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
@@ -61,7 +67,7 @@ jobs:
             exit 1
           fi
           gh api "repos/$GH_REPO/pulls/$PR_NUMBER" > "$RUNNER_TEMP/pr.json"
-          merge_sha="$(node scripts/validate-sync-pr.mjs "$RUNNER_TEMP/pr.json" "$GH_REPO")"
+          merge_sha="$(node --experimental-strip-types scripts/validate-sync-pr.mts "$RUNNER_TEMP/pr.json" "$GH_REPO")"
           git fetch origin main develop
           if ! git merge-base --is-ancestor "$merge_sha" origin/main; then
             echo '::error::The PR merge commit is not an ancestor of main.'

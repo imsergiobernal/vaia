@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { parseReleaseRef } from './validate-release.mjs';
+import { parseReleaseRef } from './validate-release.mts';
 
 export function validateSyncPullRequest(pr, repository) {
   if (!pr || pr.merged !== true || pr.base?.ref !== 'main' ||

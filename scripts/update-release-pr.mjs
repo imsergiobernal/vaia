@@ -2,9 +2,9 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { parseReleaseRef } from './validate-release.mjs';
-import { extractReleaseNotes } from './release-notes.mjs';
-import { githubClient, releaseNotesContext, releaseNotesOwner, renderPullRequestBody } from './sync-release-notes.mjs';
+import { parseReleaseRef } from './validate-release.mts';
+import { extractReleaseNotes } from './release-notes.mts';
+import { githubClient, releaseNotesContext, releaseNotesOwner, renderPullRequestBody } from './sync-release-notes.mts';
 
 const draftStart = '<!-- vaia-release-draft:start -->';
 const draftEnd = '<!-- vaia-release-draft:end -->';
