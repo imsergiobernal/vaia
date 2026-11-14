@@ -18,6 +18,7 @@ Key technologies: TypeScript (strict), Node.js 22+, ESM (`"type": "module"`), oc
 - Build all packages (openapi → sdk → cli): `pnpm build`
 - Type-check the whole workspace and scripts: `pnpm typecheck`
 - Type-check release tooling: `pnpm typecheck:scripts`
+- Run release tooling tests: `pnpm test`
 - Regenerate SDK types from the OpenAPI contract: `pnpm generate`
 - Validate a commit message file: `pnpm commitlint --edit <commit-message-file>`
 
@@ -33,6 +34,7 @@ Prerequisites: Node.js 22.12+ (required by commitlint) and pnpm 12.6.0 (pinned i
 ## Validation Instructions
 
 - Run `pnpm build` and `pnpm typecheck` before pushing.
+- Run `pnpm test` to check the release tooling.
 - Scripts run directly with `node --experimental-strip-types`, including on Node.js 22.12. Use explicit `.mts` relative imports and type-only imports for types; avoid syntax requiring TypeScript transformation.
 - `pnpm typecheck:scripts` checks release tooling. The isolated `smoke-sdk.mts` and `sdk-consumer.mts` consumers are checked against the packed SDK by `.github/actions/verify-sdk`.
 - Release workflows additionally verify the packed CLI and SDK outside the workspace.

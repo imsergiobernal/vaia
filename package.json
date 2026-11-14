@@ -8,6 +8,7 @@
     "typecheck": "pnpm -r typecheck && pnpm typecheck:scripts",
     "typecheck:scripts": "tsc -p scripts/tsconfig.json",
     "lint": "pnpm -r lint",
+    "test": "node --experimental-strip-types --test scripts/*.test.mjs",
     "commitlint": "commitlint",
     "generate": "pnpm --filter @imsergiobernal/vaia-sdk generate",
     "release:prepare": "node --experimental-strip-types scripts/prepare-release.mts"
