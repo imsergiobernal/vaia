@@ -51,6 +51,18 @@ a new package; npm creates a public `0.0.0-stage` placeholder while the actual
 staged version's contents remain unavailable until approval. See
 [npm staged publishing](https://docs.npmjs.com/staged-publishing/).
 
+After a version is approved and available in npm, **Sync npm releases to GitHub
+Packages** copies the same tarball to GitHub Packages. The workflow runs every
+30 minutes, when a GitHub Release is published, and on manual dispatch. A
+release event before npm approval is safe: a later scheduled run picks it up.
+Only stable component tags integrated into `main` are considered. Existing
+versions are checked against npm's SHA-512 integrity, so repeated runs skip
+matching packages and fail if the registries disagree. Publishing uses the
+repository's `GITHUB_TOKEN` with `packages: write`; the linked GitHub packages
+must grant this repository's Actions workflow write access. The workflow does not
+change package visibility. For a newly created package, check its visibility in
+GitHub Packages settings.
+
 To avoid renewing tokens later, configure [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/)
 in each package's npm settings with these values:
 
