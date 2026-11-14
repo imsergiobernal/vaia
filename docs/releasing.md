@@ -131,9 +131,8 @@ CLI tarball with a local packed SDK before staging it.
 ## Draft final release notes
 
 The maintainer `imsergiobernal` (GitHub user ID `20087388`) drafts the final
-notes in a personal Codex session. On every push to the release branch, the
-preparation workflow refreshes the automatic draft and editorial status in the
-PR using its scoped App token; it does not start Codex, merge or publish. Keep
+notes in a personal Codex session. The **Sync release notes** workflow copies
+reviewed notes to the PR when manually dispatched from `develop`. Keep
 the Codex environment private; repository prompts and markers do not independently
 authenticate an agent, reviewer or approval.
 
@@ -151,8 +150,8 @@ authenticate an agent, reviewer or approval.
    <!-- vaia-release-notes {"component":"cli","version":"0.2.0","candidate":"<40-character-candidate-sha>","previous_tag":"cli-v0.1.0"} -->
    ```
 
-4. The next **Prepare release branch** run copies fresh editorial notes into the
-   PR and displays the separate automatic draft. The synchronizer requires the
+4. Run **Sync release notes** from `develop` with the release PR number. The
+   synchronizer requires the
    candidate to be an ancestor of the release head and permits only the component
    changelog to differ from that candidate. It preserves existing PR text and
    replaces only its own notes block. Redraft after later source changes.
@@ -160,12 +159,12 @@ authenticate an agent, reviewer or approval.
 
    ```sh
    pnpm install --frozen-lockfile
+   pnpm test
    pnpm --filter '@imsergiobernal/vaia-cli...' --fail-if-no-match -r run build
    pnpm typecheck
    ```
 
-The existing **Sync release notes** workflow remains available as a manual
-fallback from `develop`; it only runs for `imsergiobernal` and checks both the
+The **Sync release notes** workflow only runs for `imsergiobernal` and checks both the
 original actor and rerun actor. Its workflow file must exist on the default
 branch before GitHub offers the manual trigger.
 

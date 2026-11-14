@@ -49,6 +49,8 @@ Prerequisites: Node.js 22.12+ (required by commitlint) and pnpm 12.6.0 (pinned i
 
 ## Build and Deployment
 
+- There is currently no general CI workflow for pushes or pull requests.
+
 - Release workflows validate tags and versions, build and type-check the workspace, and verify packed SDK/CLI tarballs with `.github/actions/verify-sdk` and `.github/actions/verify-cli`.
 - Before pushing, run `pnpm build` and `pnpm typecheck` locally.
 

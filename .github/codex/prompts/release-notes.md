@@ -29,8 +29,7 @@ After preparing the changelog locally, open a same-repository PR from
 6. Report the source evidence and uncertainties. Do not invent release content,
    update the PR body directly, merge, create tags, publish or send public comments.
 
-After the notes commit is pushed, **Prepare release branch** checks freshness and
-copies the committed entry into the release PR body. Its separate automatic
-draft remains a working list. This workflow does not start Codex, access a Codex
-account, merge or publish anything. The owner-only **Sync release notes**
-workflow remains available as a manual fallback from `develop`.
+After the notes commit is pushed, the maintainer can run **Sync release notes**
+from `develop` with the PR number. It checks freshness and copies the committed
+entry into the PR body. The workflow does not start Codex, access a Codex
+account, merge or publish anything.
