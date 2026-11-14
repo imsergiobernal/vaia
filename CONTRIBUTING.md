@@ -201,5 +201,6 @@ for branch naming, local component and changelog preparation, Git Flow Next
 and publication. Each release PR goes directly from its release branch to `main`.
 After stabilization, draft notes in your personal Codex session
 and follow the [release notes procedure](docs/releasing.md#draft-final-release-notes).
-Only `imsergiobernal` may run the workflow that synchronizes the committed notes
-into the release PR. Keep the procedures in the release guide.
+The preparation workflow updates the automatic draft and fresh editorial notes
+in the release PR. Only `imsergiobernal` may run the manual synchronization
+fallback. Keep the procedures in the release guide.

@@ -130,13 +130,11 @@ CLI tarball with a local packed SDK before staging it.
 
 ## Draft final release notes
 
-The maintainer `imsergiobernal` (GitHub user ID `20087388`) drafts notes in a
-personal Codex session. The **Sync release notes** workflow runs manually from
-`develop` in `imsergiobernal/vaia` and checks the original actor and rerun actor.
-It uses trusted scripts from `develop`, reads the release branch's committed
-changelog and updates only the PR body; it does not start Codex, merge or publish.
-Keep the Codex environment private; repository prompts and markers do not
-independently authenticate an agent or reviewer.
+The maintainer `imsergiobernal` (GitHub user ID `20087388`) drafts the final
+notes in a personal Codex session. The **Sync release notes** workflow copies
+reviewed notes to the PR when manually dispatched from `develop`. Keep
+the Codex environment private; repository prompts and markers do not independently
+authenticate an agent, reviewer or approval.
 
 1. Prepare and push the release branch locally and open its PR to `main`.
    Stabilize source and dependency changes on that same branch.
@@ -152,9 +150,8 @@ independently authenticate an agent or reviewer.
    <!-- vaia-release-notes {"component":"cli","version":"0.2.0","candidate":"<40-character-candidate-sha>","previous_tag":"cli-v0.1.0"} -->
    ```
 
-4. In **Actions > Sync release notes > Run workflow**, select `develop` and
-   provide the release PR number. The workflow must already exist on the default
-   branch before GitHub offers its manual trigger. The synchronizer requires the
+4. Run **Sync release notes** from `develop` with the release PR number. The
+   synchronizer requires the
    candidate to be an ancestor of the release head and permits only the component
    changelog to differ from that candidate. It preserves existing PR text and
    replaces only its own notes block. Redraft after later source changes.
@@ -162,24 +159,39 @@ independently authenticate an agent or reviewer.
 
    ```sh
    pnpm install --frozen-lockfile
+   pnpm test
    pnpm --filter '@imsergiobernal/vaia-cli...' --fail-if-no-match -r run build
    pnpm typecheck
    ```
 
+The **Sync release notes** workflow only runs for `imsergiobernal` and checks both the
+original actor and rerun actor. Its workflow file must exist on the default
+branch before GitHub offers the manual trigger.
+
 ## Finish and publish
 
-Merge the reviewed release PR into `main` using a merge commit. Record the
-exact merge commit SHA shown by GitHub as `<PR_MERGE_COMMIT_SHA>`; use that SHA
-rather than whichever commit `main` happens to point at later. Update `develop`
-from `main`, then create and push the component tag on the merge commit:
+Merge the reviewed release PR into `main` using a merge commit. The **Sync
+develop after release** workflow validates the merged release or hotfix PR,
+then uses Git Flow Next to update `develop` from `main`. It uses the preparation
+App's repository-scoped token, so the App must be permitted to push to `develop`.
+It neither creates tags nor publishes packages. Wait for this workflow and the
+resulting CI run before continuing. A concurrent update or a conflict fails the
+workflow without force-pushing; resolve it and run the workflow again.
+
+For a release merged before the workflow existed, or to retry after a failure,
+run **Sync develop after release** manually from `develop` and provide the merged
+release PR number. Manual dispatch is restricted to the maintainer. GitHub only
+offers manual workflows present on the default branch. For manual conflict
+resolution, fetch `main` and `develop`, update `develop` from `main`, review the
+result, and push it before retrying.
+
+Record the exact merge commit SHA shown by GitHub as `<PR_MERGE_COMMIT_SHA>`;
+use that SHA rather than whichever commit `main` happens to point at later. Once
+the synchronization succeeds, create and push the component tag:
 
 ```sh
 git fetch origin --tags
 git merge-base --is-ancestor <PR_MERGE_COMMIT_SHA> origin/main
-git switch develop
-git pull --ff-only origin develop
-git merge --no-ff origin/main
-git push origin develop
 git tag -a cli-v0.2.0 <PR_MERGE_COMMIT_SHA> -m "cli-v0.2.0"
 git push origin refs/tags/cli-v0.2.0
 ```
